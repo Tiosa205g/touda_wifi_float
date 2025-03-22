@@ -1,25 +1,24 @@
-import sys
 import math
-from PySide6.QtCore import Qt, QRectF, QPointF, QPropertyAnimation, QTimer, Property,QSize
+from PySide6.QtCore import Qt, QRectF, QPropertyAnimation, Property,QSize
 from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QLinearGradient
-from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton
-from qfluentwidgets import PushButton
+from PySide6.QtWidgets import  QWidget
 class WaterBall(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, x=200, speed=1, water_color=QColor(33, 150, 243), border_color = QColor(100, 100, 100), parent=None):
         super().__init__(parent)
+        scale = x / 200
         self._progress = 0
         self._wave_offset = 0
-        self._wave_height = 10
+        self._wave_height = 10*scale
         self._wave_speed = 0.05
-        self._water_color = QColor(33, 150, 243)
-        self._border_color = QColor(100, 100, 100)
+        self._water_color = water_color
+        self._border_color = border_color
         
         # 波浪动画
         self.wave_animation = QPropertyAnimation(self, b"wave_offset")
-        self.wave_animation.setDuration(2500)
+        self.wave_animation.setDuration(100000/speed)
         self.wave_animation.setLoopCount(-1)
-        self.wave_animation.setStartValue(0)
-        self.wave_animation.setEndValue(math.pi*180)
+        self.wave_animation.setStartValue(math.pi*18)
+        self.wave_animation.setEndValue(math.pi*1800)
         self.wave_animation.start()
         
     def get_progress(self):
@@ -84,29 +83,3 @@ class WaterBall(QWidget):
         
     def sizeHint(self):
         return QSize(200, 200)
-
-class DemoWindow(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("水球进度效果")
-        self.resize(300, 350)
-        
-        layout = QVBoxLayout()
-        self.water_ball = WaterBall()
-        layout.addWidget(self.water_ball, alignment=Qt.AlignCenter)
-        
-        self.btn_start = QPushButton("开始动画")
-        self.btn_start.clicked.connect(self.start_animation)
-        layout.addWidget(self.btn_start)
-        
-        self.setLayout(layout)
-        
-    def start_animation(self):
-        self.water_ball.progress = 50
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = DemoWindow()
-    window.show()
-    sys.exit(app.exec())
