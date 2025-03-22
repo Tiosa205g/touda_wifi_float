@@ -27,8 +27,9 @@ if __name__ == '__main__':
     import sys
 
     app = QApplication(sys.argv)
+    tray = Tray(QIcon('D:\\Source\\Python\\touda_wifi_float\\res\\favicon.ico'))
     win = FloatBall()
     win.show()
-    tray = Tray(QIcon('D:\\Source\\Python\\touda_wifi_float\\res\\favicon.ico'),win)
+    
 
-    sys.exit(app.exec())
+    app.exec()
