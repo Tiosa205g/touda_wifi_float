@@ -3,7 +3,7 @@ from PySide6.QtCore import Qt, QRectF, QPropertyAnimation, Property,QSize
 from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QLinearGradient
 from PySide6.QtWidgets import  QWidget
 class WaterBall(QWidget):
-    def __init__(self, x=200, speed=1, water_color=QColor(33, 150, 243), border_color = QColor(100, 100, 100), parent=None):
+    def __init__(self, x=200, speed=1, water_color=QColor(33, 150, 243), border_color = QColor(100, 100, 100), background_color = QColor(128,128,128), parent=None):
         super().__init__(parent)
         scale = x / 200
         self._progress = 0
@@ -12,7 +12,9 @@ class WaterBall(QWidget):
         self._wave_speed = 0.05
         self._water_color = water_color
         self._border_color = border_color
-        
+        self._background_color = background_color
+        self.setFixedSize(x, x)
+
         # 波浪动画
         self.wave_animation = QPropertyAnimation(self, b"wave_offset")
         self.wave_animation.setDuration(100000/speed)
@@ -48,6 +50,10 @@ class WaterBall(QWidget):
         rect = QRectF(5, 5, diameter, diameter)
         painter.setPen(self._border_color)
         painter.drawEllipse(rect)
+
+        # 填充背景色
+        painter.setBrush(QBrush(self._background_color))
+        painter.drawEllipse(rect)
         
         # 计算水位高度（Y坐标从下往上增长）
         water_height = (1 - self._progress / 100) * diameter
@@ -80,6 +86,15 @@ class WaterBall(QWidget):
         painter.setPen(Qt.NoPen)
         painter.setBrush(QBrush(gradient))
         painter.drawPath(wave_path)
+        
+        # 绘制中间的数字
+        painter.setPen(Qt.white)
+        font = painter.font()
+        font.setPointSize(x/10)
+        painter.setFont(font)
+        text = f"{self._progress}%"
+        text_rect = painter.boundingRect(rect, Qt.AlignCenter, text)
+        painter.drawText(text_rect, Qt.AlignCenter, text)
         
     def sizeHint(self):
         return QSize(200, 200)
