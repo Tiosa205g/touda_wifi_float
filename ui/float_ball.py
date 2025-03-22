@@ -1,12 +1,14 @@
-from qframelesswindow import FramelessWindow
 from PySide6.QtWidgets import QApplication,QHBoxLayout
 from PySide6 import QtCore
+from PySide6.QtGui import QIcon
 from components import WaterBall
-class FloatBall(FramelessWindow):
+from windows import DragWindow
+from tray import Tray
+class FloatBall(DragWindow):
     def __init__(self):
         super().__init__()
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
-        self.setFixedSize(500, 200)
+        self.setFixedSize(1000, 700)
         self.initUI()
 
         self.show()
@@ -14,7 +16,9 @@ class FloatBall(FramelessWindow):
         mainLayout = QHBoxLayout(self)
         mainLayout.setContentsMargins(0, 0, 0, 0)
 
-        self.waterball = WaterBall()
+        self.waterball = WaterBall(100)
+        self.waterball.setFixedSize(100,100)
+        self.waterball.progress = 50
         mainLayout.addWidget(self.waterball)
         self.setLayout(mainLayout)
 
@@ -24,4 +28,7 @@ if __name__ == '__main__':
 
     app = QApplication(sys.argv)
     win = FloatBall()
-    sys.exit(app.exec_())
+    win.show()
+    tray = Tray(QIcon('D:\\Source\\Python\\touda_wifi_float\\res\\favicon.ico'),win)
+
+    sys.exit(app.exec())
