@@ -1,16 +1,16 @@
-from PySide6.QtWidgets import QApplication, QHBoxLayout
-from PySide6 import QtCore, QtGui
-from PySide6.QtGui import QIcon
-from components import WaterBall
-from windows import DragWindow
-from tray import Tray
+from PySide6.QtWidgets import QHBoxLayout
+from PySide6.QtCore import Qt
+from .components import WaterBall
+from .windows import DragWindow
+from .tray import Tray
 
 class FloatBall(DragWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
-        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        self.setFixedSize(1000, 700)
+        self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
+        self.titleBar.hide()
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        #self.setFixedSize(1000, 700)
         self.initUI()
         self.show()
 
@@ -24,12 +24,3 @@ class FloatBall(DragWindow):
         mainLayout.addWidget(self.waterball)
         self.setLayout(mainLayout)
 
-if __name__ == '__main__':
-    import sys
-
-    app = QApplication(sys.argv)
-    tray = Tray(QIcon('D:\\Source\\Python\\touda_wifi_float\\res\\favicon.ico'))
-    win = FloatBall()
-    win.show()
-
-    app.exec()
