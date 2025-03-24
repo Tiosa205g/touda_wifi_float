@@ -25,3 +25,4 @@ class Tray(QSystemTrayIcon):
 
     def quit(self):
         print('quit')
+        exit()

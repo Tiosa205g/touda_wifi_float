@@ -4,7 +4,7 @@ from .components import WaterBall
 
 class UI_FloatBall:
     def setupUI(self, FloatBall):
-        FloatBall.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
+        FloatBall.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.Tool)
         FloatBall.titleBar.hide()
         FloatBall.setAttribute(Qt.WA_TranslucentBackground)
         #self.setFixedSize(1000, 700)

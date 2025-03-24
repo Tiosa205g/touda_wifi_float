@@ -6,7 +6,7 @@ from src import Tray
 if __name__ == '__main__':
     app = QApplication()
     tray = Tray(QIcon('res/ico/favicon.ico'))
-    win = win_float_ball.FloatBall()
+    win = win_float_ball.FloatBall(app.primaryScreen().size())
     win.show()
 
     app.exec()
