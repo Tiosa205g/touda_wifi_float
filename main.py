@@ -1,12 +1,12 @@
 from PySide6 import QtCore
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
-from ui import FloatBall
-from ui import Tray
+from src import win_float_ball
+from src import Tray
 if __name__ == '__main__':
     app = QApplication()
     tray = Tray(QIcon('res/ico/favicon.ico'))
-    win = FloatBall()
+    win = win_float_ball.FloatBall()
     win.show()
 
     app.exec()

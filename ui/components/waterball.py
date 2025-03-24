@@ -1,8 +1,9 @@
 import math
-from PySide6.QtCore import Qt, QRectF, QPropertyAnimation, Property,QSize
+from PySide6.QtCore import Qt, QRectF, QPropertyAnimation, Property, QSize, Signal
 from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QLinearGradient
 from PySide6.QtWidgets import  QWidget
 class WaterBall(QWidget):
+    clicked = Signal()
     def __init__(self, x=200, speed=1, water_color=QColor(33, 150, 243), border_color = QColor(100, 100, 100), background_color = QColor(128,128,128), parent=None):
         super().__init__(parent)
         scale = x / 200
@@ -98,3 +99,8 @@ class WaterBall(QWidget):
         
     def sizeHint(self):
         return QSize(200, 200)
+    
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+        return super().mousePressEvent(event)
