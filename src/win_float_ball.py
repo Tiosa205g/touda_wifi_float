@@ -3,10 +3,13 @@ from qfluentwidgets import FluentIcon as FIF
 from ui.float_ball import UI_FloatBall
 from ui.windows.drag_window import DragWindow
 class FloatBall(DragWindow):
-    def __init__(self):
+    def __init__(self,screen_size):
         super().__init__()
         self.ui = UI_FloatBall()
         self.ui.setupUI(self)
+        self.setFixedSize(self.ui.waterball.size())
+
+        self.setCanLeftScreen(False, screen_size=screen_size)
 
         self.ui.waterball.clicked.connect(self.waterball_clicked)
     def waterball_clicked(self):
@@ -14,6 +17,5 @@ class FloatBall(DragWindow):
                             'This is a ball','This is a ball that you can click on',
                             FIF.BASKETBALL,
                             isClosable=True,
-                            tailPosition=TeachingTipTailPosition.LEFT_TOP,
                             duration=3000,
                             parent=self.ui.waterball)
