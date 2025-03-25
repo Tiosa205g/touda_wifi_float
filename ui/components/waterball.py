@@ -4,6 +4,7 @@ from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QLinearGradien
 from PySide6.QtWidgets import  QWidget
 class WaterBall(QWidget):
     clicked = Signal()
+    rightClicked = Signal()
     def __init__(self, x=200, speed=1, water_color=QColor(33, 150, 243), border_color = QColor(100, 100, 100), background_color = QColor(128,128,128), parent=None):
         super().__init__(parent)
         scale = x / 200
@@ -103,4 +104,6 @@ class WaterBall(QWidget):
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.clicked.emit()
+        elif event.button() == Qt.RightButton:
+            self.rightClicked.emit()
         return super().mousePressEvent(event)
