@@ -8,18 +8,13 @@ class Tray(QSystemTrayIcon):
         self.setToolTip('Tray')
 
         self.menu = SystemTrayMenu("touda_wifi", parent=parent)
-        self.displayAction = Action('Display', self)
-        self.quitAction = Action('Quit', self)
-
-        self.displayAction.triggered.connect(self.display)
-        self.quitAction.triggered.connect(self.quit)
-
-        self.menu.addAction(self.displayAction)
-        self.menu.addAction(self.quitAction)
+        self.menu.addActions([Action('Display',triggered=self.display),
+                              Action('Quit', triggered=self.quit)])
 
         self.setContextMenu(self.menu)
-        print('Tray created')
         self.show()
+
+        print('Tray created')
 
     def display(self):
         print('show')
