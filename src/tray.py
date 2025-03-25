@@ -1,14 +1,15 @@
-from PySide6.QtWidgets import QSystemTrayIcon, QMenu
-from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QSystemTrayIcon
+from qfluentwidgets import SystemTrayMenu, Action
 
 class Tray(QSystemTrayIcon):
-    def __init__(self, icon, parent=None):
-        super().__init__(icon=icon, parent=parent)
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.setIcon(parent.windowIcon())
         self.setToolTip('Tray')
 
-        self.menu = QMenu()
-        self.displayAction = QAction('Display', self)
-        self.quitAction = QAction('Quit', self)
+        self.menu = SystemTrayMenu("touda_wifi", parent=parent)
+        self.displayAction = Action('Display', self)
+        self.quitAction = Action('Quit', self)
 
         self.displayAction.triggered.connect(self.display)
         self.quitAction.triggered.connect(self.quit)

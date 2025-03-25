@@ -5,8 +5,10 @@ from src import win_float_ball
 from src import Tray
 if __name__ == '__main__':
     app = QApplication()
-    tray = Tray(QIcon('res/ico/favicon.ico'))
+    
     win = win_float_ball.FloatBall(app.primaryScreen().size())
+    win.setWindowIcon(QIcon('res/ico/favicon.ico'))
+    tray = Tray(win)
     win.show()
 
     app.exec()
