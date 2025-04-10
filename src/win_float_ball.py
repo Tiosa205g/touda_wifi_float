@@ -11,9 +11,10 @@ class FloatBall(DragWindow):
 
         self.setCanLeftScreen(False, screen_size=screen_size)
         self.ui.waterball.contextMenuEvent = self.waterball_menu
-        self.ui.waterball.clicked.connect(self.waterball_clicked)
+        self.ui.waterball.doubleClicked.connect(self.waterball_double_click)
         #self.ui.waterball.rightClicked.connect(self.waterball_right_clicked)
-    def waterball_clicked(self):
+    def waterball_double_click(self):
+        
         TeachingTip.create(self.ui.waterball,
                             'This is a ball','This is a ball that you can click on',
                             FIF.BASKETBALL,
