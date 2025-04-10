@@ -5,6 +5,7 @@ from PySide6.QtWidgets import  QWidget
 class WaterBall(QWidget):
     clicked = Signal()
     rightClicked = Signal()
+    doubleClicked = Signal()
     def __init__(self, x=200, speed=1, water_color=QColor(33, 150, 243), border_color = QColor(100, 100, 100), background_color = QColor(128,128,128), parent=None):
         super().__init__(parent)
         scale = x / 200
@@ -107,3 +108,7 @@ class WaterBall(QWidget):
         elif event.button() == Qt.RightButton:
             self.rightClicked.emit()
         return super().mousePressEvent(event)
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.doubleClicked.emit()
+        return super().mouseDoubleClickEvent(event)
