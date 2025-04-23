@@ -20,7 +20,7 @@ class WaterBall(QWidget):
 
         # 波浪动画
         self.wave_animation = QPropertyAnimation(self, b"wave_offset")
-        self.wave_animation.setDuration(100000/speed)
+        self.wave_animation.setDuration(int(100000/speed))
         self.wave_animation.setLoopCount(-1)
         self.wave_animation.setStartValue(math.pi*18)
         self.wave_animation.setEndValue(math.pi*1800)
@@ -93,7 +93,7 @@ class WaterBall(QWidget):
         # 绘制中间的数字
         painter.setPen(Qt.white)
         font = painter.font()
-        font.setPointSize(x/10)
+        font.setPointSize(int(self.size().width()/10))
         painter.setFont(font)
         text = f"{self._progress}%"
         text_rect = painter.boundingRect(rect, Qt.AlignCenter, text)
