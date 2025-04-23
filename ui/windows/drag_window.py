@@ -4,15 +4,15 @@ from PySide6.QtCore import QPoint,Qt, QSize
 class DragWindow(FramelessWindow):
     __is_dragging:bool = False
     __start_drag_position:QPoint = QPoint()
-    __leftscreen = True
+    __leftScreen = True
     __screen_size = QSize()
     def __init__(self, parent=None):
         super().__init__(parent=parent)
     def setCanLeftScreen(self, leftscreen:bool, screen_size):
-        '''
+        """
             设置是否能够拖离屏幕
-        '''
-        self.__leftscreen = leftscreen
+        """
+        self.__leftScreen = leftscreen
         self.__screen_size = screen_size
     #设置拖拽
     def mousePressEvent(self, event):
@@ -23,7 +23,7 @@ class DragWindow(FramelessWindow):
     def mouseMoveEvent(self, event):
         if self.__is_dragging:
             pos = event.globalPos() - self.__start_drag_position
-            if not self.__leftscreen:
+            if not self.__leftScreen:
                 width = self.__screen_size.width() # 屏幕宽度
                 height = self.__screen_size.height() # 屏幕高度
                 geo = self.geometry()
