@@ -1,631 +1,18 @@
+import os
+
 import pyotp
 import json
 import requests
 import execjs
+import re
+import base64
 from lxml import etree
+
 class encrypt:
-    js="""window={};navigator={};var dbits, canary = 0xdeadbeefcafe, j_lm = 15715070 == (16777215 & canary);
-function BigInteger(t, r, i) {
-    null != t && ("number" == typeof t ? this.fromNumber(t, r, i) : null == r && "string" != typeof t ? this.fromString(t, 256) : this.fromString(t, r))
-}
-function nbi() {
-    return new BigInteger(null)
-}
-function am1(t, r, i, n, o, e) {
-    for (; 0 <= --e; ) {
-        var s = r * this[t++] + i[n] + o;
-        o = Math.floor(s / 67108864),
-        i[n++] = 67108863 & s
-    }
-    return o
-}
-function am2(t, r, i, n, o, e) {
-    for (var s = 32767 & r, h = r >> 15; 0 <= --e; ) {
-        var p = 32767 & this[t]
-          , g = this[t++] >> 15
-          , u = h * p + g * s;
-        o = ((p = s * p + ((32767 & u) << 15) + i[n] + (1073741823 & o)) >>> 30) + (u >>> 15) + h * g + (o >>> 30),
-        i[n++] = 1073741823 & p
-    }
-    return o
-}
-function am3(t, r, i, n, o, e) {
-    for (var s = 16383 & r, h = r >> 14; 0 <= --e; ) {
-        var p = 16383 & this[t]
-          , g = this[t++] >> 14
-          , u = h * p + g * s;
-        o = ((p = s * p + ((16383 & u) << 14) + i[n] + o) >> 28) + (u >> 14) + h * g,
-        i[n++] = 268435455 & p
-    }
-    return o
-}
-j_lm && "Microsoft Internet Explorer" == navigator.appName ? (BigInteger.prototype.am = am2,
-dbits = 30) : j_lm && "Netscape" != navigator.appName ? (BigInteger.prototype.am = am1,
-dbits = 26) : (BigInteger.prototype.am = am3,
-dbits = 28),
-BigInteger.prototype.DB = dbits,
-BigInteger.prototype.DM = (1 << dbits) - 1,
-BigInteger.prototype.DV = 1 << dbits;
-var BI_FP = 52;
-BigInteger.prototype.FV = Math.pow(2, BI_FP),
-BigInteger.prototype.F1 = BI_FP - dbits,
-BigInteger.prototype.F2 = 2 * dbits - BI_FP;
-var rr, vv, BI_RM = "0123456789abcdefghijklmnopqrstuvwxyz", BI_RC = new Array;
-for (rr = "0".charCodeAt(0),
-vv = 0; vv <= 9; ++vv)
-    BI_RC[rr++] = vv;
-for (rr = "a".charCodeAt(0),
-vv = 10; vv < 36; ++vv)
-    BI_RC[rr++] = vv;
-for (rr = "A".charCodeAt(0),
-vv = 10; vv < 36; ++vv)
-    BI_RC[rr++] = vv;
-function int2char(t) {
-    return BI_RM.charAt(t)
-}
-function intAt(t, r) {
-    var i = BI_RC[t.charCodeAt(r)];
-    return null == i ? -1 : i
-}
-function bnpCopyTo(t) {
-    for (var r = this.t - 1; 0 <= r; --r)
-        t[r] = this[r];
-    t.t = this.t,
-    t.s = this.s
-}
-function bnpFromInt(t) {
-    this.t = 1,
-    this.s = t < 0 ? -1 : 0,
-    0 < t ? this[0] = t : t < -1 ? this[0] = t + this.DV : this.t = 0
-}
-function nbv(t) {
-    var r = nbi();
-    return r.fromInt(t),
-    r
-}
-function bnpFromString(t, r) {
-    var i;
-    if (16 == r)
-        i = 4;
-    else if (8 == r)
-        i = 3;
-    else if (256 == r)
-        i = 8;
-    else if (2 == r)
-        i = 1;
-    else if (32 == r)
-        i = 5;
-    else {
-        if (4 != r)
-            return void this.fromRadix(t, r);
-        i = 2
-    }
-    this.t = 0,
-    this.s = 0;
-    for (var n = t.length, o = !1, e = 0; 0 <= --n; ) {
-        var s = 8 == i ? 255 & t[n] : intAt(t, n);
-        s < 0 ? "-" == t.charAt(n) && (o = !0) : (o = !1,
-        0 == e ? this[this.t++] = s : e + i > this.DB ? (this[this.t - 1] |= (s & (1 << this.DB - e) - 1) << e,
-        this[this.t++] = s >> this.DB - e) : this[this.t - 1] |= s << e,
-        (e += i) >= this.DB && (e -= this.DB))
-    }
-    8 == i && 0 != (128 & t[0]) && (this.s = -1,
-    0 < e && (this[this.t - 1] |= (1 << this.DB - e) - 1 << e)),
-    this.clamp(),
-    o && BigInteger.ZERO.subTo(this, this)
-}
-function bnpClamp() {
-    for (var t = this.s & this.DM; 0 < this.t && this[this.t - 1] == t; )
-        --this.t
-}
-function bnToString(t) {
-    if (this.s < 0)
-        return "-" + this.negate().toString(t);
-    var r;
-    if (16 == t)
-        r = 4;
-    else if (8 == t)
-        r = 3;
-    else if (2 == t)
-        r = 1;
-    else if (32 == t)
-        r = 5;
-    else {
-        if (4 != t)
-            return this.toRadix(t);
-        r = 2
-    }
-    var i, n = (1 << r) - 1, o = !1, e = "", s = this.t, h = this.DB - s * this.DB % r;
-    if (0 < s--)
-        for (h < this.DB && 0 < (i = this[s] >> h) && (o = !0,
-        e = int2char(i)); 0 <= s; )
-            h < r ? (i = (this[s] & (1 << h) - 1) << r - h,
-            i |= this[--s] >> (h += this.DB - r)) : (i = this[s] >> (h -= r) & n,
-            h <= 0 && (h += this.DB,
-            --s)),
-            0 < i && (o = !0),
-            o && (e += int2char(i));
-    return o ? e : "0"
-}
-function bnNegate() {
-    var t = nbi();
-    return BigInteger.ZERO.subTo(this, t),
-    t
-}
-function bnAbs() {
-    return this.s < 0 ? this.negate() : this
-}
-function bnCompareTo(t) {
-    var r = this.s - t.s;
-    if (0 != r)
-        return r;
-    var i = this.t;
-    if (0 != (r = i - t.t))
-        return this.s < 0 ? -r : r;
-    for (; 0 <= --i; )
-        if (0 != (r = this[i] - t[i]))
-            return r;
-    return 0
-}
-function nbits(t) {
-    var r, i = 1;
-    return 0 != (r = t >>> 16) && (t = r,
-    i += 16),
-    0 != (r = t >> 8) && (t = r,
-    i += 8),
-    0 != (r = t >> 4) && (t = r,
-    i += 4),
-    0 != (r = t >> 2) && (t = r,
-    i += 2),
-    0 != (r = t >> 1) && (t = r,
-    i += 1),
-    i
-}
-function bnBitLength() {
-    return this.t <= 0 ? 0 : this.DB * (this.t - 1) + nbits(this[this.t - 1] ^ this.s & this.DM)
-}
-function bnpDLShiftTo(t, r) {
-    var i;
-    for (i = this.t - 1; 0 <= i; --i)
-        r[i + t] = this[i];
-    for (i = t - 1; 0 <= i; --i)
-        r[i] = 0;
-    r.t = this.t + t,
-    r.s = this.s
-}
-function bnpDRShiftTo(t, r) {
-    for (var i = t; i < this.t; ++i)
-        r[i - t] = this[i];
-    r.t = Math.max(this.t - t, 0),
-    r.s = this.s
-}
-function bnpLShiftTo(t, r) {
-    var i, n = t % this.DB, o = this.DB - n, e = (1 << o) - 1, s = Math.floor(t / this.DB), h = this.s << n & this.DM;
-    for (i = this.t - 1; 0 <= i; --i)
-        r[i + s + 1] = this[i] >> o | h,
-        h = (this[i] & e) << n;
-    for (i = s - 1; 0 <= i; --i)
-        r[i] = 0;
-    r[s] = h,
-    r.t = this.t + s + 1,
-    r.s = this.s,
-    r.clamp()
-}
-function bnpRShiftTo(t, r) {
-    r.s = this.s;
-    var i = Math.floor(t / this.DB);
-    if (i >= this.t)
-        r.t = 0;
-    else {
-        var n = t % this.DB
-          , o = this.DB - n
-          , e = (1 << n) - 1;
-        r[0] = this[i] >> n;
-        for (var s = i + 1; s < this.t; ++s)
-            r[s - i - 1] |= (this[s] & e) << o,
-            r[s - i] = this[s] >> n;
-        0 < n && (r[this.t - i - 1] |= (this.s & e) << o),
-        r.t = this.t - i,
-        r.clamp()
-    }
-}
-function bnpSubTo(t, r) {
-    for (var i = 0, n = 0, o = Math.min(t.t, this.t); i < o; )
-        n += this[i] - t[i],
-        r[i++] = n & this.DM,
-        n >>= this.DB;
-    if (t.t < this.t) {
-        for (n -= t.s; i < this.t; )
-            n += this[i],
-            r[i++] = n & this.DM,
-            n >>= this.DB;
-        n += this.s
-    } else {
-        for (n += this.s; i < t.t; )
-            n -= t[i],
-            r[i++] = n & this.DM,
-            n >>= this.DB;
-        n -= t.s
-    }
-    r.s = n < 0 ? -1 : 0,
-    n < -1 ? r[i++] = this.DV + n : 0 < n && (r[i++] = n),
-    r.t = i,
-    r.clamp()
-}
-function bnpMultiplyTo(t, r) {
-    var i = this.abs()
-      , n = t.abs()
-      , o = i.t;
-    for (r.t = o + n.t; 0 <= --o; )
-        r[o] = 0;
-    for (o = 0; o < n.t; ++o)
-        r[o + i.t] = i.am(0, n[o], r, o, 0, i.t);
-    r.s = 0,
-    r.clamp(),
-    this.s != t.s && BigInteger.ZERO.subTo(r, r)
-}
-function bnpSquareTo(t) {
-    for (var r = this.abs(), i = t.t = 2 * r.t; 0 <= --i; )
-        t[i] = 0;
-    for (i = 0; i < r.t - 1; ++i) {
-        var n = r.am(i, r[i], t, 2 * i, 0, 1);
-        (t[i + r.t] += r.am(i + 1, 2 * r[i], t, 2 * i + 1, n, r.t - i - 1)) >= r.DV && (t[i + r.t] -= r.DV,
-        t[i + r.t + 1] = 1)
-    }
-    0 < t.t && (t[t.t - 1] += r.am(i, r[i], t, 2 * i, 0, 1)),
-    t.s = 0,
-    t.clamp()
-}
-function bnpDivRemTo(t, r, i) {
-    var n = t.abs();
-    if (!(n.t <= 0)) {
-        var o = this.abs();
-        if (o.t < n.t)
-            return null != r && r.fromInt(0),
-            void (null != i && this.copyTo(i));
-        null == i && (i = nbi());
-        var e = nbi()
-          , s = this.s
-          , h = t.s
-          , p = this.DB - nbits(n[n.t - 1]);
-        0 < p ? (n.lShiftTo(p, e),
-        o.lShiftTo(p, i)) : (n.copyTo(e),
-        o.copyTo(i));
-        var g = e.t
-          , u = e[g - 1];
-        if (0 != u) {
-            var a = u * (1 << this.F1) + (1 < g ? e[g - 2] >> this.F2 : 0)
-              , f = this.FV / a
-              , l = (1 << this.F1) / a
-              , c = 1 << this.F2
-              , m = i.t
-              , v = m - g
-              , b = null == r ? nbi() : r;
-            for (e.dlShiftTo(v, b),
-            0 <= i.compareTo(b) && (i[i.t++] = 1,
-            i.subTo(b, i)),
-            BigInteger.ONE.dlShiftTo(g, b),
-            b.subTo(e, e); e.t < g; )
-                e[e.t++] = 0;
-            for (; 0 <= --v; ) {
-                var y = i[--m] == u ? this.DM : Math.floor(i[m] * f + (i[m - 1] + c) * l);
-                if ((i[m] += e.am(0, y, i, v, 0, g)) < y)
-                    for (e.dlShiftTo(v, b),
-                    i.subTo(b, i); i[m] < --y; )
-                        i.subTo(b, i)
-            }
-            null != r && (i.drShiftTo(g, r),
-            s != h && BigInteger.ZERO.subTo(r, r)),
-            i.t = g,
-            i.clamp(),
-            0 < p && i.rShiftTo(p, i),
-            s < 0 && BigInteger.ZERO.subTo(i, i)
-        }
-    }
-}
-function bnMod(t) {
-    var r = nbi();
-    return this.abs().divRemTo(t, null, r),
-    this.s < 0 && 0 < r.compareTo(BigInteger.ZERO) && t.subTo(r, r),
-    r
-}
-function Classic(t) {
-    this.m = t
-}
-function cConvert(t) {
-    return t.s < 0 || 0 <= t.compareTo(this.m) ? t.mod(this.m) : t
-}
-function cRevert(t) {
-    return t
-}
-function cReduce(t) {
-    t.divRemTo(this.m, null, t)
-}
-function cMulTo(t, r, i) {
-    t.multiplyTo(r, i),
-    this.reduce(i)
-}
-function cSqrTo(t, r) {
-    t.squareTo(r),
-    this.reduce(r)
-}
-function bnpInvDigit() {
-    if (this.t < 1)
-        return 0;
-    var t = this[0];
-    if (0 == (1 & t))
-        return 0;
-    var r = 3 & t;
-    return 0 < (r = (r = (r = (r = r * (2 - (15 & t) * r) & 15) * (2 - (255 & t) * r) & 255) * (2 - ((65535 & t) * r & 65535)) & 65535) * (2 - t * r % this.DV) % this.DV) ? this.DV - r : -r
-}
-function Montgomery(t) {
-    this.m = t,
-    this.mp = t.invDigit(),
-    this.mpl = 32767 & this.mp,
-    this.mph = this.mp >> 15,
-    this.um = (1 << t.DB - 15) - 1,
-    this.mt2 = 2 * t.t
-}
-function montConvert(t) {
-    var r = nbi();
-    return t.abs().dlShiftTo(this.m.t, r),
-    r.divRemTo(this.m, null, r),
-    t.s < 0 && 0 < r.compareTo(BigInteger.ZERO) && this.m.subTo(r, r),
-    r
-}
-function montRevert(t) {
-    var r = nbi();
-    return t.copyTo(r),
-    this.reduce(r),
-    r
-}
-function montReduce(t) {
-    for (; t.t <= this.mt2; )
-        t[t.t++] = 0;
-    for (var r = 0; r < this.m.t; ++r) {
-        var i = 32767 & t[r]
-          , n = i * this.mpl + ((i * this.mph + (t[r] >> 15) * this.mpl & this.um) << 15) & t.DM;
-        for (t[i = r + this.m.t] += this.m.am(0, n, t, r, 0, this.m.t); t[i] >= t.DV; )
-            t[i] -= t.DV,
-            t[++i]++
-    }
-    t.clamp(),
-    t.drShiftTo(this.m.t, t),
-    0 <= t.compareTo(this.m) && t.subTo(this.m, t)
-}
-function montSqrTo(t, r) {
-    t.squareTo(r),
-    this.reduce(r)
-}
-function montMulTo(t, r, i) {
-    t.multiplyTo(r, i),
-    this.reduce(i)
-}
-function bnpIsEven() {
-    return 0 == (0 < this.t ? 1 & this[0] : this.s)
-}
-function bnpExp(t, r) {
-    if (4294967295 < t || t < 1)
-        return BigInteger.ONE;
-    var i = nbi()
-      , n = nbi()
-      , o = r.convert(this)
-      , e = nbits(t) - 1;
-    for (o.copyTo(i); 0 <= --e; )
-        if (r.sqrTo(i, n),
-        0 < (t & 1 << e))
-            r.mulTo(n, o, i);
-        else {
-            var s = i;
-            i = n,
-            n = s
-        }
-    return r.revert(i)
-}
-function bnModPowInt(t, r) {
-    var i;
-    return i = t < 256 || r.isEven() ? new Classic(r) : new Montgomery(r),
-    this.exp(t, i)
-}
-function Arcfour() {
-    this.i = 0,
-    this.j = 0,
-    this.S = new Array
-}
-function ARC4init(t) {
-    var r, i, n;
-    for (r = 0; r < 256; ++r)
-        this.S[r] = r;
-    for (r = i = 0; r < 256; ++r)
-        i = i + this.S[r] + t[r % t.length] & 255,
-        n = this.S[r],
-        this.S[r] = this.S[i],
-        this.S[i] = n;
-    this.i = 0,
-    this.j = 0
-}
-function ARC4next() {
-    var t;
-    return this.i = this.i + 1 & 255,
-    this.j = this.j + this.S[this.i] & 255,
-    t = this.S[this.i],
-    this.S[this.i] = this.S[this.j],
-    this.S[this.j] = t,
-    this.S[t + this.S[this.i] & 255]
-}
-function prng_newstate() {
-    return new Arcfour
-}
-Classic.prototype.convert = cConvert,
-Classic.prototype.revert = cRevert,
-Classic.prototype.reduce = cReduce,
-Classic.prototype.mulTo = cMulTo,
-Classic.prototype.sqrTo = cSqrTo,
-Montgomery.prototype.convert = montConvert,
-Montgomery.prototype.revert = montRevert,
-Montgomery.prototype.reduce = montReduce,
-Montgomery.prototype.mulTo = montMulTo,
-Montgomery.prototype.sqrTo = montSqrTo,
-BigInteger.prototype.copyTo = bnpCopyTo,
-BigInteger.prototype.fromInt = bnpFromInt,
-BigInteger.prototype.fromString = bnpFromString,
-BigInteger.prototype.clamp = bnpClamp,
-BigInteger.prototype.dlShiftTo = bnpDLShiftTo,
-BigInteger.prototype.drShiftTo = bnpDRShiftTo,
-BigInteger.prototype.lShiftTo = bnpLShiftTo,
-BigInteger.prototype.rShiftTo = bnpRShiftTo,
-BigInteger.prototype.subTo = bnpSubTo,
-BigInteger.prototype.multiplyTo = bnpMultiplyTo,
-BigInteger.prototype.squareTo = bnpSquareTo,
-BigInteger.prototype.divRemTo = bnpDivRemTo,
-BigInteger.prototype.invDigit = bnpInvDigit,
-BigInteger.prototype.isEven = bnpIsEven,
-BigInteger.prototype.exp = bnpExp,
-BigInteger.prototype.toString = bnToString,
-BigInteger.prototype.negate = bnNegate,
-BigInteger.prototype.abs = bnAbs,
-BigInteger.prototype.compareTo = bnCompareTo,
-BigInteger.prototype.bitLength = bnBitLength,
-BigInteger.prototype.mod = bnMod,
-BigInteger.prototype.modPowInt = bnModPowInt,
-BigInteger.ZERO = nbv(0),
-BigInteger.ONE = nbv(1),
-Arcfour.prototype.init = ARC4init,
-Arcfour.prototype.next = ARC4next;
-var rng_state, rng_pool, rng_pptr, rng_psize = 256;
-function rng_seed_int(t) {
-    rng_pool[rng_pptr++] ^= 255 & t,
-    rng_pool[rng_pptr++] ^= t >> 8 & 255,
-    rng_pool[rng_pptr++] ^= t >> 16 & 255,
-    rng_pool[rng_pptr++] ^= t >> 24 & 255,
-    rng_psize <= rng_pptr && (rng_pptr -= rng_psize)
-}
-function rng_seed_time() {
-    rng_seed_int((new Date).getTime())
-}
-if (null == rng_pool) {
-    var t;
-    if (rng_pool = new Array,
-    rng_pptr = 0,
-    window.crypto && window.crypto.getRandomValues) {
-        var ua = new Uint8Array(32);
-        for (window.crypto.getRandomValues(ua),
-        t = 0; t < 32; ++t)
-            rng_pool[rng_pptr++] = ua[t]
-    }
-    if ("Netscape" == navigator.appName && navigator.appVersion < "5" && window.crypto) {
-        var z = window.crypto.random(32);
-        for (t = 0; t < z.length; ++t)
-            rng_pool[rng_pptr++] = 255 & z.charCodeAt(t)
-    }
-    for (; rng_pptr < rng_psize; )
-        t = Math.floor(65536 * Math.random()),
-        rng_pool[rng_pptr++] = t >>> 8,
-        rng_pool[rng_pptr++] = 255 & t;
-    rng_pptr = 0,
-    rng_seed_time()
-}
-function rng_get_byte() {
-    if (null == rng_state) {
-        for (rng_seed_time(),
-        (rng_state = prng_newstate()).init(rng_pool),
-        rng_pptr = 0; rng_pptr < rng_pool.length; ++rng_pptr)
-            rng_pool[rng_pptr] = 0;
-        rng_pptr = 0
-    }
-    return rng_state.next()
-}
-function rng_get_bytes(t) {
-    var r;
-    for (r = 0; r < t.length; ++r)
-        t[r] = rng_get_byte()
-}
-function SecureRandom() {}
-function parseBigInt(t, r) {
-    return new BigInteger(t,r)
-}
-function linebrk(t, r) {
-    for (var i = "", n = 0; n + r < t.length; )
-        i += t.substring(n, n + r) + "\n",
-        n += r;
-    return i + t.substring(n, t.length)
-}
-function byte2Hex(t) {
-    return t < 16 ? "0" + t.toString(16) : t.toString(16)
-}
-function pkcs1pad2(t, r) {
-    if (r < t.length + 11)
-        return console && console.error && console.error("Message too long for RSA"),
-        null;
-    for (var i = new Array, n = t.length - 1; 0 <= n && 0 < r; ) {
-        var o = t.charCodeAt(n--);
-        o < 128 ? i[--r] = o : 127 < o && o < 2048 ? (i[--r] = 63 & o | 128,
-        i[--r] = o >> 6 | 192) : (i[--r] = 63 & o | 128,
-        i[--r] = o >> 6 & 63 | 128,
-        i[--r] = o >> 12 | 224)
-    }
-    i[--r] = 0;
-    for (var e = new SecureRandom, s = new Array; 2 < r; ) {
-        for (s[0] = 0; 0 == s[0]; )
-            e.nextBytes(s);
-        i[--r] = s[0]
-    }
-    return i[--r] = 2,
-    i[--r] = 0,
-    new BigInteger(i)
-}
-function RSAKey() {
-    this.n = null,
-    this.e = 0,
-    this.d = null,
-    this.p = null,
-    this.q = null,
-    this.dmp1 = null,
-    this.dmq1 = null,
-    this.coeff = null
-}
-function RSASetPublic(t, r) {
-    null != t && null != r && 0 < t.length && 0 < r.length ? (this.n = parseBigInt(t, 16),
-    this.e = parseInt(r, 16)) : alert("Invalid RSA public key")
-}
-function RSADoPublic(t) {
-    return t.modPowInt(this.e, this.n)
-}
-function RSAEncrypt(t) {
-    var r = pkcs1pad2(t, this.n.bitLength() + 7 >> 3);
-    if (null == r)
-        return null;
-    var i = this.doPublic(r);
-    return null == i ? null : FixEncryptLength(i.toString(16))
-}
-function FixEncryptLength(t) {
-    var r, i, n, o = t.length, e = [128, 256, 512, 1024, 2048, 4096];
-    for (i = 0; i < e.length; i++) {
-        if (o === (r = e[i]))
-            return t;
-        if (o < r) {
-            var s = r - o
-              , h = "";
-            for (n = 0; n < s; n++)
-                h += "0";
-            return h + t
-        }
-    }
-    return t
-}
-function getkey(id){
-r="A4F210DFEF9EA05D517E0C38CBB9BAE5BCF64639ED71120F5BDCE24AC2270E20AC4AC4029A951D373820760EFE6EE2539943BC407B0CD96803B5D07EDEFE185048D7695A338C62DDF4A7576D20BD2A64FF5400D92029F48383D7DB01E9BCC302FCCBFC5C2F36413378A9EEDD4799ED6C0DB6D482C1ABAFDD3EAB2ADA17F873E3C19D7B3C110EEA9C81D4B87DA1AB4663EC55C5AA17BE5ECCFF32510429F759395BB37EEB32E4D71CAD0A5D0A8D5657B00D4DA52DD7E918CFBDEA9ED1F80402477785D37D9BAE0CE2652F9D567BCBF37267B511C845D9857687FA95002B04D8B1BB4FABE9E2DEC1CCE153D19E0EB9CFF927BC14B625012663F8297A6E1F0D7D6F";
-i = "10001";
-s = new RSAKey;
-s.setPublic(r, i);
-t = s.encrypt(id);
-return t;
-}
-SecureRandom.prototype.nextBytes = rng_get_bytes,
-RSAKey.prototype.doPublic = RSADoPublic,
-RSAKey.prototype.setPublic = RSASetPublic,
-RSAKey.prototype.encrypt = RSAEncrypt;
-"""
+    # base64解码js
+    js = "d2luZG93PXt9O25hdmlnYXRvcj17fTt2YXIgZGJpdHMsIGNhbmFyeSA9IDB4ZGVhZGJlZWZjYWZlLCBqX2xtID0gMTU3MTUwNzAgPT0gKDE2Nzc3MjE1ICYgY2FuYXJ5KTsKZnVuY3Rpb24gQmlnSW50ZWdlcih0LCByLCBpKSB7CiAgICBudWxsICE9IHQgJiYgKCJudW1iZXIiID09IHR5cGVvZiB0ID8gdGhpcy5mcm9tTnVtYmVyKHQsIHIsIGkpIDogbnVsbCA9PSByICYmICJzdHJpbmciICE9IHR5cGVvZiB0ID8gdGhpcy5mcm9tU3RyaW5nKHQsIDI1NikgOiB0aGlzLmZyb21TdHJpbmcodCwgcikpCn0KZnVuY3Rpb24gbmJpKCkgewogICAgcmV0dXJuIG5ldyBCaWdJbnRlZ2VyKG51bGwpCn0KZnVuY3Rpb24gYW0xKHQsIHIsIGksIG4sIG8sIGUpIHsKICAgIGZvciAoOyAwIDw9IC0tZTsgKSB7CiAgICAgICAgdmFyIHMgPSByICogdGhpc1t0KytdICsgaVtuXSArIG87CiAgICAgICAgbyA9IE1hdGguZmxvb3IocyAvIDY3MTA4ODY0KSwKICAgICAgICBpW24rK10gPSA2NzEwODg2MyAmIHMKICAgIH0KICAgIHJldHVybiBvCn0KZnVuY3Rpb24gYW0yKHQsIHIsIGksIG4sIG8sIGUpIHsKICAgIGZvciAodmFyIHMgPSAzMjc2NyAmIHIsIGggPSByID4+IDE1OyAwIDw9IC0tZTsgKSB7CiAgICAgICAgdmFyIHAgPSAzMjc2NyAmIHRoaXNbdF0KICAgICAgICAgICwgZyA9IHRoaXNbdCsrXSA+PiAxNQogICAgICAgICAgLCB1ID0gaCAqIHAgKyBnICogczsKICAgICAgICBvID0gKChwID0gcyAqIHAgKyAoKDMyNzY3ICYgdSkgPDwgMTUpICsgaVtuXSArICgxMDczNzQxODIzICYgbykpID4+PiAzMCkgKyAodSA+Pj4gMTUpICsgaCAqIGcgKyAobyA+Pj4gMzApLAogICAgICAgIGlbbisrXSA9IDEwNzM3NDE4MjMgJiBwCiAgICB9CiAgICByZXR1cm4gbwp9CmZ1bmN0aW9uIGFtMyh0LCByLCBpLCBuLCBvLCBlKSB7CiAgICBmb3IgKHZhciBzID0gMTYzODMgJiByLCBoID0gciA+PiAxNDsgMCA8PSAtLWU7ICkgewogICAgICAgIHZhciBwID0gMTYzODMgJiB0aGlzW3RdCiAgICAgICAgICAsIGcgPSB0aGlzW3QrK10gPj4gMTQKICAgICAgICAgICwgdSA9IGggKiBwICsgZyAqIHM7CiAgICAgICAgbyA9ICgocCA9IHMgKiBwICsgKCgxNjM4MyAmIHUpIDw8IDE0KSArIGlbbl0gKyBvKSA+PiAyOCkgKyAodSA+PiAxNCkgKyBoICogZywKICAgICAgICBpW24rK10gPSAyNjg0MzU0NTUgJiBwCiAgICB9CiAgICByZXR1cm4gbwp9CmpfbG0gJiYgIk1pY3Jvc29mdCBJbnRlcm5ldCBFeHBsb3JlciIgPT0gbmF2aWdhdG9yLmFwcE5hbWUgPyAoQmlnSW50ZWdlci5wcm90b3R5cGUuYW0gPSBhbTIsCmRiaXRzID0gMzApIDogal9sbSAmJiAiTmV0c2NhcGUiICE9IG5hdmlnYXRvci5hcHBOYW1lID8gKEJpZ0ludGVnZXIucHJvdG90eXBlLmFtID0gYW0xLApkYml0cyA9IDI2KSA6IChCaWdJbnRlZ2VyLnByb3RvdHlwZS5hbSA9IGFtMywKZGJpdHMgPSAyOCksCkJpZ0ludGVnZXIucHJvdG90eXBlLkRCID0gZGJpdHMsCkJpZ0ludGVnZXIucHJvdG90eXBlLkRNID0gKDEgPDwgZGJpdHMpIC0gMSwKQmlnSW50ZWdlci5wcm90b3R5cGUuRFYgPSAxIDw8IGRiaXRzOwp2YXIgQklfRlAgPSA1MjsKQmlnSW50ZWdlci5wcm90b3R5cGUuRlYgPSBNYXRoLnBvdygyLCBCSV9GUCksCkJpZ0ludGVnZXIucHJvdG90eXBlLkYxID0gQklfRlAgLSBkYml0cywKQmlnSW50ZWdlci5wcm90b3R5cGUuRjIgPSAyICogZGJpdHMgLSBCSV9GUDsKdmFyIHJyLCB2diwgQklfUk0gPSAiMDEyMzQ1Njc4OWFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6IiwgQklfUkMgPSBuZXcgQXJyYXk7CmZvciAocnIgPSAiMCIuY2hhckNvZGVBdCgwKSwKdnYgPSAwOyB2diA8PSA5OyArK3Z2KQogICAgQklfUkNbcnIrK10gPSB2djsKZm9yIChyciA9ICJhIi5jaGFyQ29kZUF0KDApLAp2diA9IDEwOyB2diA8IDM2OyArK3Z2KQogICAgQklfUkNbcnIrK10gPSB2djsKZm9yIChyciA9ICJBIi5jaGFyQ29kZUF0KDApLAp2diA9IDEwOyB2diA8IDM2OyArK3Z2KQogICAgQklfUkNbcnIrK10gPSB2djsKZnVuY3Rpb24gaW50MmNoYXIodCkgewogICAgcmV0dXJuIEJJX1JNLmNoYXJBdCh0KQp9CmZ1bmN0aW9uIGludEF0KHQsIHIpIHsKICAgIHZhciBpID0gQklfUkNbdC5jaGFyQ29kZUF0KHIpXTsKICAgIHJldHVybiBudWxsID09IGkgPyAtMSA6IGkKfQpmdW5jdGlvbiBibnBDb3B5VG8odCkgewogICAgZm9yICh2YXIgciA9IHRoaXMudCAtIDE7IDAgPD0gcjsgLS1yKQogICAgICAgIHRbcl0gPSB0aGlzW3JdOwogICAgdC50ID0gdGhpcy50LAogICAgdC5zID0gdGhpcy5zCn0KZnVuY3Rpb24gYm5wRnJvbUludCh0KSB7CiAgICB0aGlzLnQgPSAxLAogICAgdGhpcy5zID0gdCA8IDAgPyAtMSA6IDAsCiAgICAwIDwgdCA/IHRoaXNbMF0gPSB0IDogdCA8IC0xID8gdGhpc1swXSA9IHQgKyB0aGlzLkRWIDogdGhpcy50ID0gMAp9CmZ1bmN0aW9uIG5idih0KSB7CiAgICB2YXIgciA9IG5iaSgpOwogICAgcmV0dXJuIHIuZnJvbUludCh0KSwKICAgIHIKfQpmdW5jdGlvbiBibnBGcm9tU3RyaW5nKHQsIHIpIHsKICAgIHZhciBpOwogICAgaWYgKDE2ID09IHIpCiAgICAgICAgaSA9IDQ7CiAgICBlbHNlIGlmICg4ID09IHIpCiAgICAgICAgaSA9IDM7CiAgICBlbHNlIGlmICgyNTYgPT0gcikKICAgICAgICBpID0gODsKICAgIGVsc2UgaWYgKDIgPT0gcikKICAgICAgICBpID0gMTsKICAgIGVsc2UgaWYgKDMyID09IHIpCiAgICAgICAgaSA9IDU7CiAgICBlbHNlIHsKICAgICAgICBpZiAoNCAhPSByKQogICAgICAgICAgICByZXR1cm4gdm9pZCB0aGlzLmZyb21SYWRpeCh0LCByKTsKICAgICAgICBpID0gMgogICAgfQogICAgdGhpcy50ID0gMCwKICAgIHRoaXMucyA9IDA7CiAgICBmb3IgKHZhciBuID0gdC5sZW5ndGgsIG8gPSAhMSwgZSA9IDA7IDAgPD0gLS1uOyApIHsKICAgICAgICB2YXIgcyA9IDggPT0gaSA/IDI1NSAmIHRbbl0gOiBpbnRBdCh0LCBuKTsKICAgICAgICBzIDwgMCA/ICItIiA9PSB0LmNoYXJBdChuKSAmJiAobyA9ICEwKSA6IChvID0gITEsCiAgICAgICAgMCA9PSBlID8gdGhpc1t0aGlzLnQrK10gPSBzIDogZSArIGkgPiB0aGlzLkRCID8gKHRoaXNbdGhpcy50IC0gMV0gfD0gKHMgJiAoMSA8PCB0aGlzLkRCIC0gZSkgLSAxKSA8PCBlLAogICAgICAgIHRoaXNbdGhpcy50KytdID0gcyA+PiB0aGlzLkRCIC0gZSkgOiB0aGlzW3RoaXMudCAtIDFdIHw9IHMgPDwgZSwKICAgICAgICAoZSArPSBpKSA+PSB0aGlzLkRCICYmIChlIC09IHRoaXMuREIpKQogICAgfQogICAgOCA9PSBpICYmIDAgIT0gKDEyOCAmIHRbMF0pICYmICh0aGlzLnMgPSAtMSwKICAgIDAgPCBlICYmICh0aGlzW3RoaXMudCAtIDFdIHw9ICgxIDw8IHRoaXMuREIgLSBlKSAtIDEgPDwgZSkpLAogICAgdGhpcy5jbGFtcCgpLAogICAgbyAmJiBCaWdJbnRlZ2VyLlpFUk8uc3ViVG8odGhpcywgdGhpcykKfQpmdW5jdGlvbiBibnBDbGFtcCgpIHsKICAgIGZvciAodmFyIHQgPSB0aGlzLnMgJiB0aGlzLkRNOyAwIDwgdGhpcy50ICYmIHRoaXNbdGhpcy50IC0gMV0gPT0gdDsgKQogICAgICAgIC0tdGhpcy50Cn0KZnVuY3Rpb24gYm5Ub1N0cmluZyh0KSB7CiAgICBpZiAodGhpcy5zIDwgMCkKICAgICAgICByZXR1cm4gIi0iICsgdGhpcy5uZWdhdGUoKS50b1N0cmluZyh0KTsKICAgIHZhciByOwogICAgaWYgKDE2ID09IHQpCiAgICAgICAgciA9IDQ7CiAgICBlbHNlIGlmICg4ID09IHQpCiAgICAgICAgciA9IDM7CiAgICBlbHNlIGlmICgyID09IHQpCiAgICAgICAgciA9IDE7CiAgICBlbHNlIGlmICgzMiA9PSB0KQogICAgICAgIHIgPSA1OwogICAgZWxzZSB7CiAgICAgICAgaWYgKDQgIT0gdCkKICAgICAgICAgICAgcmV0dXJuIHRoaXMudG9SYWRpeCh0KTsKICAgICAgICByID0gMgogICAgfQogICAgdmFyIGksIG4gPSAoMSA8PCByKSAtIDEsIG8gPSAhMSwgZSA9ICIiLCBzID0gdGhpcy50LCBoID0gdGhpcy5EQiAtIHMgKiB0aGlzLkRCICUgcjsKICAgIGlmICgwIDwgcy0tKQogICAgICAgIGZvciAoaCA8IHRoaXMuREIgJiYgMCA8IChpID0gdGhpc1tzXSA+PiBoKSAmJiAobyA9ICEwLAogICAgICAgIGUgPSBpbnQyY2hhcihpKSk7IDAgPD0gczsgKQogICAgICAgICAgICBoIDwgciA/IChpID0gKHRoaXNbc10gJiAoMSA8PCBoKSAtIDEpIDw8IHIgLSBoLAogICAgICAgICAgICBpIHw9IHRoaXNbLS1zXSA+PiAoaCArPSB0aGlzLkRCIC0gcikpIDogKGkgPSB0aGlzW3NdID4+IChoIC09IHIpICYgbiwKICAgICAgICAgICAgaCA8PSAwICYmIChoICs9IHRoaXMuREIsCiAgICAgICAgICAgIC0tcykpLAogICAgICAgICAgICAwIDwgaSAmJiAobyA9ICEwKSwKICAgICAgICAgICAgbyAmJiAoZSArPSBpbnQyY2hhcihpKSk7CiAgICByZXR1cm4gbyA/IGUgOiAiMCIKfQpmdW5jdGlvbiBibk5lZ2F0ZSgpIHsKICAgIHZhciB0ID0gbmJpKCk7CiAgICByZXR1cm4gQmlnSW50ZWdlci5aRVJPLnN1YlRvKHRoaXMsIHQpLAogICAgdAp9CmZ1bmN0aW9uIGJuQWJzKCkgewogICAgcmV0dXJuIHRoaXMucyA8IDAgPyB0aGlzLm5lZ2F0ZSgpIDogdGhpcwp9CmZ1bmN0aW9uIGJuQ29tcGFyZVRvKHQpIHsKICAgIHZhciByID0gdGhpcy5zIC0gdC5zOwogICAgaWYgKDAgIT0gcikKICAgICAgICByZXR1cm4gcjsKICAgIHZhciBpID0gdGhpcy50OwogICAgaWYgKDAgIT0gKHIgPSBpIC0gdC50KSkKICAgICAgICByZXR1cm4gdGhpcy5zIDwgMCA/IC1yIDogcjsKICAgIGZvciAoOyAwIDw9IC0taTsgKQogICAgICAgIGlmICgwICE9IChyID0gdGhpc1tpXSAtIHRbaV0pKQogICAgICAgICAgICByZXR1cm4gcjsKICAgIHJldHVybiAwCn0KZnVuY3Rpb24gbmJpdHModCkgewogICAgdmFyIHIsIGkgPSAxOwogICAgcmV0dXJuIDAgIT0gKHIgPSB0ID4+PiAxNikgJiYgKHQgPSByLAogICAgaSArPSAxNiksCiAgICAwICE9IChyID0gdCA+PiA4KSAmJiAodCA9IHIsCiAgICBpICs9IDgpLAogICAgMCAhPSAociA9IHQgPj4gNCkgJiYgKHQgPSByLAogICAgaSArPSA0KSwKICAgIDAgIT0gKHIgPSB0ID4+IDIpICYmICh0ID0gciwKICAgIGkgKz0gMiksCiAgICAwICE9IChyID0gdCA+PiAxKSAmJiAodCA9IHIsCiAgICBpICs9IDEpLAogICAgaQp9CmZ1bmN0aW9uIGJuQml0TGVuZ3RoKCkgewogICAgcmV0dXJuIHRoaXMudCA8PSAwID8gMCA6IHRoaXMuREIgKiAodGhpcy50IC0gMSkgKyBuYml0cyh0aGlzW3RoaXMudCAtIDFdIF4gdGhpcy5zICYgdGhpcy5ETSkKfQpmdW5jdGlvbiBibnBETFNoaWZ0VG8odCwgcikgewogICAgdmFyIGk7CiAgICBmb3IgKGkgPSB0aGlzLnQgLSAxOyAwIDw9IGk7IC0taSkKICAgICAgICByW2kgKyB0XSA9IHRoaXNbaV07CiAgICBmb3IgKGkgPSB0IC0gMTsgMCA8PSBpOyAtLWkpCiAgICAgICAgcltpXSA9IDA7CiAgICByLnQgPSB0aGlzLnQgKyB0LAogICAgci5zID0gdGhpcy5zCn0KZnVuY3Rpb24gYm5wRFJTaGlmdFRvKHQsIHIpIHsKICAgIGZvciAodmFyIGkgPSB0OyBpIDwgdGhpcy50OyArK2kpCiAgICAgICAgcltpIC0gdF0gPSB0aGlzW2ldOwogICAgci50ID0gTWF0aC5tYXgodGhpcy50IC0gdCwgMCksCiAgICByLnMgPSB0aGlzLnMKfQpmdW5jdGlvbiBibnBMU2hpZnRUbyh0LCByKSB7CiAgICB2YXIgaSwgbiA9IHQgJSB0aGlzLkRCLCBvID0gdGhpcy5EQiAtIG4sIGUgPSAoMSA8PCBvKSAtIDEsIHMgPSBNYXRoLmZsb29yKHQgLyB0aGlzLkRCKSwgaCA9IHRoaXMucyA8PCBuICYgdGhpcy5ETTsKICAgIGZvciAoaSA9IHRoaXMudCAtIDE7IDAgPD0gaTsgLS1pKQogICAgICAgIHJbaSArIHMgKyAxXSA9IHRoaXNbaV0gPj4gbyB8IGgsCiAgICAgICAgaCA9ICh0aGlzW2ldICYgZSkgPDwgbjsKICAgIGZvciAoaSA9IHMgLSAxOyAwIDw9IGk7IC0taSkKICAgICAgICByW2ldID0gMDsKICAgIHJbc10gPSBoLAogICAgci50ID0gdGhpcy50ICsgcyArIDEsCiAgICByLnMgPSB0aGlzLnMsCiAgICByLmNsYW1wKCkKfQpmdW5jdGlvbiBibnBSU2hpZnRUbyh0LCByKSB7CiAgICByLnMgPSB0aGlzLnM7CiAgICB2YXIgaSA9IE1hdGguZmxvb3IodCAvIHRoaXMuREIpOwogICAgaWYgKGkgPj0gdGhpcy50KQogICAgICAgIHIudCA9IDA7CiAgICBlbHNlIHsKICAgICAgICB2YXIgbiA9IHQgJSB0aGlzLkRCCiAgICAgICAgICAsIG8gPSB0aGlzLkRCIC0gbgogICAgICAgICAgLCBlID0gKDEgPDwgbikgLSAxOwogICAgICAgIHJbMF0gPSB0aGlzW2ldID4+IG47CiAgICAgICAgZm9yICh2YXIgcyA9IGkgKyAxOyBzIDwgdGhpcy50OyArK3MpCiAgICAgICAgICAgIHJbcyAtIGkgLSAxXSB8PSAodGhpc1tzXSAmIGUpIDw8IG8sCiAgICAgICAgICAgIHJbcyAtIGldID0gdGhpc1tzXSA+PiBuOwogICAgICAgIDAgPCBuICYmIChyW3RoaXMudCAtIGkgLSAxXSB8PSAodGhpcy5zICYgZSkgPDwgbyksCiAgICAgICAgci50ID0gdGhpcy50IC0gaSwKICAgICAgICByLmNsYW1wKCkKICAgIH0KfQpmdW5jdGlvbiBibnBTdWJUbyh0LCByKSB7CiAgICBmb3IgKHZhciBpID0gMCwgbiA9IDAsIG8gPSBNYXRoLm1pbih0LnQsIHRoaXMudCk7IGkgPCBvOyApCiAgICAgICAgbiArPSB0aGlzW2ldIC0gdFtpXSwKICAgICAgICByW2krK10gPSBuICYgdGhpcy5ETSwKICAgICAgICBuID4+PSB0aGlzLkRCOwogICAgaWYgKHQudCA8IHRoaXMudCkgewogICAgICAgIGZvciAobiAtPSB0LnM7IGkgPCB0aGlzLnQ7ICkKICAgICAgICAgICAgbiArPSB0aGlzW2ldLAogICAgICAgICAgICByW2krK10gPSBuICYgdGhpcy5ETSwKICAgICAgICAgICAgbiA+Pj0gdGhpcy5EQjsKICAgICAgICBuICs9IHRoaXMucwogICAgfSBlbHNlIHsKICAgICAgICBmb3IgKG4gKz0gdGhpcy5zOyBpIDwgdC50OyApCiAgICAgICAgICAgIG4gLT0gdFtpXSwKICAgICAgICAgICAgcltpKytdID0gbiAmIHRoaXMuRE0sCiAgICAgICAgICAgIG4gPj49IHRoaXMuREI7CiAgICAgICAgbiAtPSB0LnMKICAgIH0KICAgIHIucyA9IG4gPCAwID8gLTEgOiAwLAogICAgbiA8IC0xID8gcltpKytdID0gdGhpcy5EViArIG4gOiAwIDwgbiAmJiAocltpKytdID0gbiksCiAgICByLnQgPSBpLAogICAgci5jbGFtcCgpCn0KZnVuY3Rpb24gYm5wTXVsdGlwbHlUbyh0LCByKSB7CiAgICB2YXIgaSA9IHRoaXMuYWJzKCkKICAgICAgLCBuID0gdC5hYnMoKQogICAgICAsIG8gPSBpLnQ7CiAgICBmb3IgKHIudCA9IG8gKyBuLnQ7IDAgPD0gLS1vOyApCiAgICAgICAgcltvXSA9IDA7CiAgICBmb3IgKG8gPSAwOyBvIDwgbi50OyArK28pCiAgICAgICAgcltvICsgaS50XSA9IGkuYW0oMCwgbltvXSwgciwgbywgMCwgaS50KTsKICAgIHIucyA9IDAsCiAgICByLmNsYW1wKCksCiAgICB0aGlzLnMgIT0gdC5zICYmIEJpZ0ludGVnZXIuWkVSTy5zdWJUbyhyLCByKQp9CmZ1bmN0aW9uIGJucFNxdWFyZVRvKHQpIHsKICAgIGZvciAodmFyIHIgPSB0aGlzLmFicygpLCBpID0gdC50ID0gMiAqIHIudDsgMCA8PSAtLWk7ICkKICAgICAgICB0W2ldID0gMDsKICAgIGZvciAoaSA9IDA7IGkgPCByLnQgLSAxOyArK2kpIHsKICAgICAgICB2YXIgbiA9IHIuYW0oaSwgcltpXSwgdCwgMiAqIGksIDAsIDEpOwogICAgICAgICh0W2kgKyByLnRdICs9IHIuYW0oaSArIDEsIDIgKiByW2ldLCB0LCAyICogaSArIDEsIG4sIHIudCAtIGkgLSAxKSkgPj0gci5EViAmJiAodFtpICsgci50XSAtPSByLkRWLAogICAgICAgIHRbaSArIHIudCArIDFdID0gMSkKICAgIH0KICAgIDAgPCB0LnQgJiYgKHRbdC50IC0gMV0gKz0gci5hbShpLCByW2ldLCB0LCAyICogaSwgMCwgMSkpLAogICAgdC5zID0gMCwKICAgIHQuY2xhbXAoKQp9CmZ1bmN0aW9uIGJucERpdlJlbVRvKHQsIHIsIGkpIHsKICAgIHZhciBuID0gdC5hYnMoKTsKICAgIGlmICghKG4udCA8PSAwKSkgewogICAgICAgIHZhciBvID0gdGhpcy5hYnMoKTsKICAgICAgICBpZiAoby50IDwgbi50KQogICAgICAgICAgICByZXR1cm4gbnVsbCAhPSByICYmIHIuZnJvbUludCgwKSwKICAgICAgICAgICAgdm9pZCAobnVsbCAhPSBpICYmIHRoaXMuY29weVRvKGkpKTsKICAgICAgICBudWxsID09IGkgJiYgKGkgPSBuYmkoKSk7CiAgICAgICAgdmFyIGUgPSBuYmkoKQogICAgICAgICAgLCBzID0gdGhpcy5zCiAgICAgICAgICAsIGggPSB0LnMKICAgICAgICAgICwgcCA9IHRoaXMuREIgLSBuYml0cyhuW24udCAtIDFdKTsKICAgICAgICAwIDwgcCA/IChuLmxTaGlmdFRvKHAsIGUpLAogICAgICAgIG8ubFNoaWZ0VG8ocCwgaSkpIDogKG4uY29weVRvKGUpLAogICAgICAgIG8uY29weVRvKGkpKTsKICAgICAgICB2YXIgZyA9IGUudAogICAgICAgICAgLCB1ID0gZVtnIC0gMV07CiAgICAgICAgaWYgKDAgIT0gdSkgewogICAgICAgICAgICB2YXIgYSA9IHUgKiAoMSA8PCB0aGlzLkYxKSArICgxIDwgZyA/IGVbZyAtIDJdID4+IHRoaXMuRjIgOiAwKQogICAgICAgICAgICAgICwgZiA9IHRoaXMuRlYgLyBhCiAgICAgICAgICAgICAgLCBsID0gKDEgPDwgdGhpcy5GMSkgLyBhCiAgICAgICAgICAgICAgLCBjID0gMSA8PCB0aGlzLkYyCiAgICAgICAgICAgICAgLCBtID0gaS50CiAgICAgICAgICAgICAgLCB2ID0gbSAtIGcKICAgICAgICAgICAgICAsIGIgPSBudWxsID09IHIgPyBuYmkoKSA6IHI7CiAgICAgICAgICAgIGZvciAoZS5kbFNoaWZ0VG8odiwgYiksCiAgICAgICAgICAgIDAgPD0gaS5jb21wYXJlVG8oYikgJiYgKGlbaS50KytdID0gMSwKICAgICAgICAgICAgaS5zdWJUbyhiLCBpKSksCiAgICAgICAgICAgIEJpZ0ludGVnZXIuT05FLmRsU2hpZnRUbyhnLCBiKSwKICAgICAgICAgICAgYi5zdWJUbyhlLCBlKTsgZS50IDwgZzsgKQogICAgICAgICAgICAgICAgZVtlLnQrK10gPSAwOwogICAgICAgICAgICBmb3IgKDsgMCA8PSAtLXY7ICkgewogICAgICAgICAgICAgICAgdmFyIHkgPSBpWy0tbV0gPT0gdSA/IHRoaXMuRE0gOiBNYXRoLmZsb29yKGlbbV0gKiBmICsgKGlbbSAtIDFdICsgYykgKiBsKTsKICAgICAgICAgICAgICAgIGlmICgoaVttXSArPSBlLmFtKDAsIHksIGksIHYsIDAsIGcpKSA8IHkpCiAgICAgICAgICAgICAgICAgICAgZm9yIChlLmRsU2hpZnRUbyh2LCBiKSwKICAgICAgICAgICAgICAgICAgICBpLnN1YlRvKGIsIGkpOyBpW21dIDwgLS15OyApCiAgICAgICAgICAgICAgICAgICAgICAgIGkuc3ViVG8oYiwgaSkKICAgICAgICAgICAgfQogICAgICAgICAgICBudWxsICE9IHIgJiYgKGkuZHJTaGlmdFRvKGcsIHIpLAogICAgICAgICAgICBzICE9IGggJiYgQmlnSW50ZWdlci5aRVJPLnN1YlRvKHIsIHIpKSwKICAgICAgICAgICAgaS50ID0gZywKICAgICAgICAgICAgaS5jbGFtcCgpLAogICAgICAgICAgICAwIDwgcCAmJiBpLnJTaGlmdFRvKHAsIGkpLAogICAgICAgICAgICBzIDwgMCAmJiBCaWdJbnRlZ2VyLlpFUk8uc3ViVG8oaSwgaSkKICAgICAgICB9CiAgICB9Cn0KZnVuY3Rpb24gYm5Nb2QodCkgewogICAgdmFyIHIgPSBuYmkoKTsKICAgIHJldHVybiB0aGlzLmFicygpLmRpdlJlbVRvKHQsIG51bGwsIHIpLAogICAgdGhpcy5zIDwgMCAmJiAwIDwgci5jb21wYXJlVG8oQmlnSW50ZWdlci5aRVJPKSAmJiB0LnN1YlRvKHIsIHIpLAogICAgcgp9CmZ1bmN0aW9uIENsYXNzaWModCkgewogICAgdGhpcy5tID0gdAp9CmZ1bmN0aW9uIGNDb252ZXJ0KHQpIHsKICAgIHJldHVybiB0LnMgPCAwIHx8IDAgPD0gdC5jb21wYXJlVG8odGhpcy5tKSA/IHQubW9kKHRoaXMubSkgOiB0Cn0KZnVuY3Rpb24gY1JldmVydCh0KSB7CiAgICByZXR1cm4gdAp9CmZ1bmN0aW9uIGNSZWR1Y2UodCkgewogICAgdC5kaXZSZW1Ubyh0aGlzLm0sIG51bGwsIHQpCn0KZnVuY3Rpb24gY011bFRvKHQsIHIsIGkpIHsKICAgIHQubXVsdGlwbHlUbyhyLCBpKSwKICAgIHRoaXMucmVkdWNlKGkpCn0KZnVuY3Rpb24gY1NxclRvKHQsIHIpIHsKICAgIHQuc3F1YXJlVG8ociksCiAgICB0aGlzLnJlZHVjZShyKQp9CmZ1bmN0aW9uIGJucEludkRpZ2l0KCkgewogICAgaWYgKHRoaXMudCA8IDEpCiAgICAgICAgcmV0dXJuIDA7CiAgICB2YXIgdCA9IHRoaXNbMF07CiAgICBpZiAoMCA9PSAoMSAmIHQpKQogICAgICAgIHJldHVybiAwOwogICAgdmFyIHIgPSAzICYgdDsKICAgIHJldHVybiAwIDwgKHIgPSAociA9IChyID0gKHIgPSByICogKDIgLSAoMTUgJiB0KSAqIHIpICYgMTUpICogKDIgLSAoMjU1ICYgdCkgKiByKSAmIDI1NSkgKiAoMiAtICgoNjU1MzUgJiB0KSAqIHIgJiA2NTUzNSkpICYgNjU1MzUpICogKDIgLSB0ICogciAlIHRoaXMuRFYpICUgdGhpcy5EVikgPyB0aGlzLkRWIC0gciA6IC1yCn0KZnVuY3Rpb24gTW9udGdvbWVyeSh0KSB7CiAgICB0aGlzLm0gPSB0LAogICAgdGhpcy5tcCA9IHQuaW52RGlnaXQoKSwKICAgIHRoaXMubXBsID0gMzI3NjcgJiB0aGlzLm1wLAogICAgdGhpcy5tcGggPSB0aGlzLm1wID4+IDE1LAogICAgdGhpcy51bSA9ICgxIDw8IHQuREIgLSAxNSkgLSAxLAogICAgdGhpcy5tdDIgPSAyICogdC50Cn0KZnVuY3Rpb24gbW9udENvbnZlcnQodCkgewogICAgdmFyIHIgPSBuYmkoKTsKICAgIHJldHVybiB0LmFicygpLmRsU2hpZnRUbyh0aGlzLm0udCwgciksCiAgICByLmRpdlJlbVRvKHRoaXMubSwgbnVsbCwgciksCiAgICB0LnMgPCAwICYmIDAgPCByLmNvbXBhcmVUbyhCaWdJbnRlZ2VyLlpFUk8pICYmIHRoaXMubS5zdWJUbyhyLCByKSwKICAgIHIKfQpmdW5jdGlvbiBtb250UmV2ZXJ0KHQpIHsKICAgIHZhciByID0gbmJpKCk7CiAgICByZXR1cm4gdC5jb3B5VG8ociksCiAgICB0aGlzLnJlZHVjZShyKSwKICAgIHIKfQpmdW5jdGlvbiBtb250UmVkdWNlKHQpIHsKICAgIGZvciAoOyB0LnQgPD0gdGhpcy5tdDI7ICkKICAgICAgICB0W3QudCsrXSA9IDA7CiAgICBmb3IgKHZhciByID0gMDsgciA8IHRoaXMubS50OyArK3IpIHsKICAgICAgICB2YXIgaSA9IDMyNzY3ICYgdFtyXQogICAgICAgICAgLCBuID0gaSAqIHRoaXMubXBsICsgKChpICogdGhpcy5tcGggKyAodFtyXSA+PiAxNSkgKiB0aGlzLm1wbCAmIHRoaXMudW0pIDw8IDE1KSAmIHQuRE07CiAgICAgICAgZm9yICh0W2kgPSByICsgdGhpcy5tLnRdICs9IHRoaXMubS5hbSgwLCBuLCB0LCByLCAwLCB0aGlzLm0udCk7IHRbaV0gPj0gdC5EVjsgKQogICAgICAgICAgICB0W2ldIC09IHQuRFYsCiAgICAgICAgICAgIHRbKytpXSsrCiAgICB9CiAgICB0LmNsYW1wKCksCiAgICB0LmRyU2hpZnRUbyh0aGlzLm0udCwgdCksCiAgICAwIDw9IHQuY29tcGFyZVRvKHRoaXMubSkgJiYgdC5zdWJUbyh0aGlzLm0sIHQpCn0KZnVuY3Rpb24gbW9udFNxclRvKHQsIHIpIHsKICAgIHQuc3F1YXJlVG8ociksCiAgICB0aGlzLnJlZHVjZShyKQp9CmZ1bmN0aW9uIG1vbnRNdWxUbyh0LCByLCBpKSB7CiAgICB0Lm11bHRpcGx5VG8ociwgaSksCiAgICB0aGlzLnJlZHVjZShpKQp9CmZ1bmN0aW9uIGJucElzRXZlbigpIHsKICAgIHJldHVybiAwID09ICgwIDwgdGhpcy50ID8gMSAmIHRoaXNbMF0gOiB0aGlzLnMpCn0KZnVuY3Rpb24gYm5wRXhwKHQsIHIpIHsKICAgIGlmICg0Mjk0OTY3Mjk1IDwgdCB8fCB0IDwgMSkKICAgICAgICByZXR1cm4gQmlnSW50ZWdlci5PTkU7CiAgICB2YXIgaSA9IG5iaSgpCiAgICAgICwgbiA9IG5iaSgpCiAgICAgICwgbyA9IHIuY29udmVydCh0aGlzKQogICAgICAsIGUgPSBuYml0cyh0KSAtIDE7CiAgICBmb3IgKG8uY29weVRvKGkpOyAwIDw9IC0tZTsgKQogICAgICAgIGlmIChyLnNxclRvKGksIG4pLAogICAgICAgIDAgPCAodCAmIDEgPDwgZSkpCiAgICAgICAgICAgIHIubXVsVG8obiwgbywgaSk7CiAgICAgICAgZWxzZSB7CiAgICAgICAgICAgIHZhciBzID0gaTsKICAgICAgICAgICAgaSA9IG4sCiAgICAgICAgICAgIG4gPSBzCiAgICAgICAgfQogICAgcmV0dXJuIHIucmV2ZXJ0KGkpCn0KZnVuY3Rpb24gYm5Nb2RQb3dJbnQodCwgcikgewogICAgdmFyIGk7CiAgICByZXR1cm4gaSA9IHQgPCAyNTYgfHwgci5pc0V2ZW4oKSA/IG5ldyBDbGFzc2ljKHIpIDogbmV3IE1vbnRnb21lcnkociksCiAgICB0aGlzLmV4cCh0LCBpKQp9CmZ1bmN0aW9uIEFyY2ZvdXIoKSB7CiAgICB0aGlzLmkgPSAwLAogICAgdGhpcy5qID0gMCwKICAgIHRoaXMuUyA9IG5ldyBBcnJheQp9CmZ1bmN0aW9uIEFSQzRpbml0KHQpIHsKICAgIHZhciByLCBpLCBuOwogICAgZm9yIChyID0gMDsgciA8IDI1NjsgKytyKQogICAgICAgIHRoaXMuU1tyXSA9IHI7CiAgICBmb3IgKHIgPSBpID0gMDsgciA8IDI1NjsgKytyKQogICAgICAgIGkgPSBpICsgdGhpcy5TW3JdICsgdFtyICUgdC5sZW5ndGhdICYgMjU1LAogICAgICAgIG4gPSB0aGlzLlNbcl0sCiAgICAgICAgdGhpcy5TW3JdID0gdGhpcy5TW2ldLAogICAgICAgIHRoaXMuU1tpXSA9IG47CiAgICB0aGlzLmkgPSAwLAogICAgdGhpcy5qID0gMAp9CmZ1bmN0aW9uIEFSQzRuZXh0KCkgewogICAgdmFyIHQ7CiAgICByZXR1cm4gdGhpcy5pID0gdGhpcy5pICsgMSAmIDI1NSwKICAgIHRoaXMuaiA9IHRoaXMuaiArIHRoaXMuU1t0aGlzLmldICYgMjU1LAogICAgdCA9IHRoaXMuU1t0aGlzLmldLAogICAgdGhpcy5TW3RoaXMuaV0gPSB0aGlzLlNbdGhpcy5qXSwKICAgIHRoaXMuU1t0aGlzLmpdID0gdCwKICAgIHRoaXMuU1t0ICsgdGhpcy5TW3RoaXMuaV0gJiAyNTVdCn0KZnVuY3Rpb24gcHJuZ19uZXdzdGF0ZSgpIHsKICAgIHJldHVybiBuZXcgQXJjZm91cgp9CkNsYXNzaWMucHJvdG90eXBlLmNvbnZlcnQgPSBjQ29udmVydCwKQ2xhc3NpYy5wcm90b3R5cGUucmV2ZXJ0ID0gY1JldmVydCwKQ2xhc3NpYy5wcm90b3R5cGUucmVkdWNlID0gY1JlZHVjZSwKQ2xhc3NpYy5wcm90b3R5cGUubXVsVG8gPSBjTXVsVG8sCkNsYXNzaWMucHJvdG90eXBlLnNxclRvID0gY1NxclRvLApNb250Z29tZXJ5LnByb3RvdHlwZS5jb252ZXJ0ID0gbW9udENvbnZlcnQsCk1vbnRnb21lcnkucHJvdG90eXBlLnJldmVydCA9IG1vbnRSZXZlcnQsCk1vbnRnb21lcnkucHJvdG90eXBlLnJlZHVjZSA9IG1vbnRSZWR1Y2UsCk1vbnRnb21lcnkucHJvdG90eXBlLm11bFRvID0gbW9udE11bFRvLApNb250Z29tZXJ5LnByb3RvdHlwZS5zcXJUbyA9IG1vbnRTcXJUbywKQmlnSW50ZWdlci5wcm90b3R5cGUuY29weVRvID0gYm5wQ29weVRvLApCaWdJbnRlZ2VyLnByb3RvdHlwZS5mcm9tSW50ID0gYm5wRnJvbUludCwKQmlnSW50ZWdlci5wcm90b3R5cGUuZnJvbVN0cmluZyA9IGJucEZyb21TdHJpbmcsCkJpZ0ludGVnZXIucHJvdG90eXBlLmNsYW1wID0gYm5wQ2xhbXAsCkJpZ0ludGVnZXIucHJvdG90eXBlLmRsU2hpZnRUbyA9IGJucERMU2hpZnRUbywKQmlnSW50ZWdlci5wcm90b3R5cGUuZHJTaGlmdFRvID0gYm5wRFJTaGlmdFRvLApCaWdJbnRlZ2VyLnByb3RvdHlwZS5sU2hpZnRUbyA9IGJucExTaGlmdFRvLApCaWdJbnRlZ2VyLnByb3RvdHlwZS5yU2hpZnRUbyA9IGJucFJTaGlmdFRvLApCaWdJbnRlZ2VyLnByb3RvdHlwZS5zdWJUbyA9IGJucFN1YlRvLApCaWdJbnRlZ2VyLnByb3RvdHlwZS5tdWx0aXBseVRvID0gYm5wTXVsdGlwbHlUbywKQmlnSW50ZWdlci5wcm90b3R5cGUuc3F1YXJlVG8gPSBibnBTcXVhcmVUbywKQmlnSW50ZWdlci5wcm90b3R5cGUuZGl2UmVtVG8gPSBibnBEaXZSZW1UbywKQmlnSW50ZWdlci5wcm90b3R5cGUuaW52RGlnaXQgPSBibnBJbnZEaWdpdCwKQmlnSW50ZWdlci5wcm90b3R5cGUuaXNFdmVuID0gYm5wSXNFdmVuLApCaWdJbnRlZ2VyLnByb3RvdHlwZS5leHAgPSBibnBFeHAsCkJpZ0ludGVnZXIucHJvdG90eXBlLnRvU3RyaW5nID0gYm5Ub1N0cmluZywKQmlnSW50ZWdlci5wcm90b3R5cGUubmVnYXRlID0gYm5OZWdhdGUsCkJpZ0ludGVnZXIucHJvdG90eXBlLmFicyA9IGJuQWJzLApCaWdJbnRlZ2VyLnByb3RvdHlwZS5jb21wYXJlVG8gPSBibkNvbXBhcmVUbywKQmlnSW50ZWdlci5wcm90b3R5cGUuYml0TGVuZ3RoID0gYm5CaXRMZW5ndGgsCkJpZ0ludGVnZXIucHJvdG90eXBlLm1vZCA9IGJuTW9kLApCaWdJbnRlZ2VyLnByb3RvdHlwZS5tb2RQb3dJbnQgPSBibk1vZFBvd0ludCwKQmlnSW50ZWdlci5aRVJPID0gbmJ2KDApLApCaWdJbnRlZ2VyLk9ORSA9IG5idigxKSwKQXJjZm91ci5wcm90b3R5cGUuaW5pdCA9IEFSQzRpbml0LApBcmNmb3VyLnByb3RvdHlwZS5uZXh0ID0gQVJDNG5leHQ7CnZhciBybmdfc3RhdGUsIHJuZ19wb29sLCBybmdfcHB0ciwgcm5nX3BzaXplID0gMjU2OwpmdW5jdGlvbiBybmdfc2VlZF9pbnQodCkgewogICAgcm5nX3Bvb2xbcm5nX3BwdHIrK10gXj0gMjU1ICYgdCwKICAgIHJuZ19wb29sW3JuZ19wcHRyKytdIF49IHQgPj4gOCAmIDI1NSwKICAgIHJuZ19wb29sW3JuZ19wcHRyKytdIF49IHQgPj4gMTYgJiAyNTUsCiAgICBybmdfcG9vbFtybmdfcHB0cisrXSBePSB0ID4+IDI0ICYgMjU1LAogICAgcm5nX3BzaXplIDw9IHJuZ19wcHRyICYmIChybmdfcHB0ciAtPSBybmdfcHNpemUpCn0KZnVuY3Rpb24gcm5nX3NlZWRfdGltZSgpIHsKICAgIHJuZ19zZWVkX2ludCgobmV3IERhdGUpLmdldFRpbWUoKSkKfQppZiAobnVsbCA9PSBybmdfcG9vbCkgewogICAgdmFyIHQ7CiAgICBpZiAocm5nX3Bvb2wgPSBuZXcgQXJyYXksCiAgICBybmdfcHB0ciA9IDAsCiAgICB3aW5kb3cuY3J5cHRvICYmIHdpbmRvdy5jcnlwdG8uZ2V0UmFuZG9tVmFsdWVzKSB7CiAgICAgICAgdmFyIHVhID0gbmV3IFVpbnQ4QXJyYXkoMzIpOwogICAgICAgIGZvciAod2luZG93LmNyeXB0by5nZXRSYW5kb21WYWx1ZXModWEpLAogICAgICAgIHQgPSAwOyB0IDwgMzI7ICsrdCkKICAgICAgICAgICAgcm5nX3Bvb2xbcm5nX3BwdHIrK10gPSB1YVt0XQogICAgfQogICAgaWYgKCJOZXRzY2FwZSIgPT0gbmF2aWdhdG9yLmFwcE5hbWUgJiYgbmF2aWdhdG9yLmFwcFZlcnNpb24gPCAiNSIgJiYgd2luZG93LmNyeXB0bykgewogICAgICAgIHZhciB6ID0gd2luZG93LmNyeXB0by5yYW5kb20oMzIpOwogICAgICAgIGZvciAodCA9IDA7IHQgPCB6Lmxlbmd0aDsgKyt0KQogICAgICAgICAgICBybmdfcG9vbFtybmdfcHB0cisrXSA9IDI1NSAmIHouY2hhckNvZGVBdCh0KQogICAgfQogICAgZm9yICg7IHJuZ19wcHRyIDwgcm5nX3BzaXplOyApCiAgICAgICAgdCA9IE1hdGguZmxvb3IoNjU1MzYgKiBNYXRoLnJhbmRvbSgpKSwKICAgICAgICBybmdfcG9vbFtybmdfcHB0cisrXSA9IHQgPj4+IDgsCiAgICAgICAgcm5nX3Bvb2xbcm5nX3BwdHIrK10gPSAyNTUgJiB0OwogICAgcm5nX3BwdHIgPSAwLAogICAgcm5nX3NlZWRfdGltZSgpCn0KZnVuY3Rpb24gcm5nX2dldF9ieXRlKCkgewogICAgaWYgKG51bGwgPT0gcm5nX3N0YXRlKSB7CiAgICAgICAgZm9yIChybmdfc2VlZF90aW1lKCksCiAgICAgICAgKHJuZ19zdGF0ZSA9IHBybmdfbmV3c3RhdGUoKSkuaW5pdChybmdfcG9vbCksCiAgICAgICAgcm5nX3BwdHIgPSAwOyBybmdfcHB0ciA8IHJuZ19wb29sLmxlbmd0aDsgKytybmdfcHB0cikKICAgICAgICAgICAgcm5nX3Bvb2xbcm5nX3BwdHJdID0gMDsKICAgICAgICBybmdfcHB0ciA9IDAKICAgIH0KICAgIHJldHVybiBybmdfc3RhdGUubmV4dCgpCn0KZnVuY3Rpb24gcm5nX2dldF9ieXRlcyh0KSB7CiAgICB2YXIgcjsKICAgIGZvciAociA9IDA7IHIgPCB0Lmxlbmd0aDsgKytyKQogICAgICAgIHRbcl0gPSBybmdfZ2V0X2J5dGUoKQp9CmZ1bmN0aW9uIFNlY3VyZVJhbmRvbSgpIHt9CmZ1bmN0aW9uIHBhcnNlQmlnSW50KHQsIHIpIHsKICAgIHJldHVybiBuZXcgQmlnSW50ZWdlcih0LHIpCn0KZnVuY3Rpb24gbGluZWJyayh0LCByKSB7CiAgICBmb3IgKHZhciBpID0gIiIsIG4gPSAwOyBuICsgciA8IHQubGVuZ3RoOyApCiAgICAgICAgaSArPSB0LnN1YnN0cmluZyhuLCBuICsgcikgKyAiXG4iLAogICAgICAgIG4gKz0gcjsKICAgIHJldHVybiBpICsgdC5zdWJzdHJpbmcobiwgdC5sZW5ndGgpCn0KZnVuY3Rpb24gYnl0ZTJIZXgodCkgewogICAgcmV0dXJuIHQgPCAxNiA/ICIwIiArIHQudG9TdHJpbmcoMTYpIDogdC50b1N0cmluZygxNikKfQpmdW5jdGlvbiBwa2NzMXBhZDIodCwgcikgewogICAgaWYgKHIgPCB0Lmxlbmd0aCArIDExKQogICAgICAgIHJldHVybiBjb25zb2xlICYmIGNvbnNvbGUuZXJyb3IgJiYgY29uc29sZS5lcnJvcigiTWVzc2FnZSB0b28gbG9uZyBmb3IgUlNBIiksCiAgICAgICAgbnVsbDsKICAgIGZvciAodmFyIGkgPSBuZXcgQXJyYXksIG4gPSB0Lmxlbmd0aCAtIDE7IDAgPD0gbiAmJiAwIDwgcjsgKSB7CiAgICAgICAgdmFyIG8gPSB0LmNoYXJDb2RlQXQobi0tKTsKICAgICAgICBvIDwgMTI4ID8gaVstLXJdID0gbyA6IDEyNyA8IG8gJiYgbyA8IDIwNDggPyAoaVstLXJdID0gNjMgJiBvIHwgMTI4LAogICAgICAgIGlbLS1yXSA9IG8gPj4gNiB8IDE5MikgOiAoaVstLXJdID0gNjMgJiBvIHwgMTI4LAogICAgICAgIGlbLS1yXSA9IG8gPj4gNiAmIDYzIHwgMTI4LAogICAgICAgIGlbLS1yXSA9IG8gPj4gMTIgfCAyMjQpCiAgICB9CiAgICBpWy0tcl0gPSAwOwogICAgZm9yICh2YXIgZSA9IG5ldyBTZWN1cmVSYW5kb20sIHMgPSBuZXcgQXJyYXk7IDIgPCByOyApIHsKICAgICAgICBmb3IgKHNbMF0gPSAwOyAwID09IHNbMF07ICkKICAgICAgICAgICAgZS5uZXh0Qnl0ZXMocyk7CiAgICAgICAgaVstLXJdID0gc1swXQogICAgfQogICAgcmV0dXJuIGlbLS1yXSA9IDIsCiAgICBpWy0tcl0gPSAwLAogICAgbmV3IEJpZ0ludGVnZXIoaSkKfQpmdW5jdGlvbiBSU0FLZXkoKSB7CiAgICB0aGlzLm4gPSBudWxsLAogICAgdGhpcy5lID0gMCwKICAgIHRoaXMuZCA9IG51bGwsCiAgICB0aGlzLnAgPSBudWxsLAogICAgdGhpcy5xID0gbnVsbCwKICAgIHRoaXMuZG1wMSA9IG51bGwsCiAgICB0aGlzLmRtcTEgPSBudWxsLAogICAgdGhpcy5jb2VmZiA9IG51bGwKfQpmdW5jdGlvbiBSU0FTZXRQdWJsaWModCwgcikgewogICAgbnVsbCAhPSB0ICYmIG51bGwgIT0gciAmJiAwIDwgdC5sZW5ndGggJiYgMCA8IHIubGVuZ3RoID8gKHRoaXMubiA9IHBhcnNlQmlnSW50KHQsIDE2KSwKICAgIHRoaXMuZSA9IHBhcnNlSW50KHIsIDE2KSkgOiBhbGVydCgiSW52YWxpZCBSU0EgcHVibGljIGtleSIpCn0KZnVuY3Rpb24gUlNBRG9QdWJsaWModCkgewogICAgcmV0dXJuIHQubW9kUG93SW50KHRoaXMuZSwgdGhpcy5uKQp9CmZ1bmN0aW9uIFJTQUVuY3J5cHQodCkgewogICAgdmFyIHIgPSBwa2NzMXBhZDIodCwgdGhpcy5uLmJpdExlbmd0aCgpICsgNyA+PiAzKTsKICAgIGlmIChudWxsID09IHIpCiAgICAgICAgcmV0dXJuIG51bGw7CiAgICB2YXIgaSA9IHRoaXMuZG9QdWJsaWMocik7CiAgICByZXR1cm4gbnVsbCA9PSBpID8gbnVsbCA6IEZpeEVuY3J5cHRMZW5ndGgoaS50b1N0cmluZygxNikpCn0KZnVuY3Rpb24gRml4RW5jcnlwdExlbmd0aCh0KSB7CiAgICB2YXIgciwgaSwgbiwgbyA9IHQubGVuZ3RoLCBlID0gWzEyOCwgMjU2LCA1MTIsIDEwMjQsIDIwNDgsIDQwOTZdOwogICAgZm9yIChpID0gMDsgaSA8IGUubGVuZ3RoOyBpKyspIHsKICAgICAgICBpZiAobyA9PT0gKHIgPSBlW2ldKSkKICAgICAgICAgICAgcmV0dXJuIHQ7CiAgICAgICAgaWYgKG8gPCByKSB7CiAgICAgICAgICAgIHZhciBzID0gciAtIG8KICAgICAgICAgICAgICAsIGggPSAiIjsKICAgICAgICAgICAgZm9yIChuID0gMDsgbiA8IHM7IG4rKykKICAgICAgICAgICAgICAgIGggKz0gIjAiOwogICAgICAgICAgICByZXR1cm4gaCArIHQKICAgICAgICB9CiAgICB9CiAgICByZXR1cm4gdAp9CmZ1bmN0aW9uIGdldGtleShpZCl7CnI9IkE0RjIxMERGRUY5RUEwNUQ1MTdFMEMzOENCQjlCQUU1QkNGNjQ2MzlFRDcxMTIwRjVCRENFMjRBQzIyNzBFMjBBQzRBQzQwMjlBOTUxRDM3MzgyMDc2MEVGRTZFRTI1Mzk5NDNCQzQwN0IwQ0Q5NjgwM0I1RDA3RURFRkUxODUwNDhENzY5NUEzMzhDNjJEREY0QTc1NzZEMjBCRDJBNjRGRjU0MDBEOTIwMjlGNDgzODNEN0RCMDFFOUJDQzMwMkZDQ0JGQzVDMkYzNjQxMzM3OEE5RUVERDQ3OTlFRDZDMERCNkQ0ODJDMUFCQUZERDNFQUIyQURBMTdGODczRTNDMTlEN0IzQzExMEVFQTlDODFENEI4N0RBMUFCNDY2M0VDNTVDNUFBMTdCRTVFQ0NGRjMyNTEwNDI5Rjc1OTM5NUJCMzdFRUIzMkU0RDcxQ0FEMEE1RDBBOEQ1NjU3QjAwRDREQTUyREQ3RTkxOENGQkRFQTlFRDFGODA0MDI0Nzc3ODVEMzdEOUJBRTBDRTI2NTJGOUQ1NjdCQ0JGMzcyNjdCNTExQzg0NUQ5ODU3Njg3RkE5NTAwMkIwNEQ4QjFCQjRGQUJFOUUyREVDMUNDRTE1M0QxOUUwRUI5Q0ZGOTI3QkMxNEI2MjUwMTI2NjNGODI5N0E2RTFGMEQ3RDZGIjsKaSA9ICIxMDAwMSI7CnMgPSBuZXcgUlNBS2V5OwpzLnNldFB1YmxpYyhyLCBpKTsKdCA9IHMuZW5jcnlwdChpZCk7CnJldHVybiB0Owp9ClNlY3VyZVJhbmRvbS5wcm90b3R5cGUubmV4dEJ5dGVzID0gcm5nX2dldF9ieXRlcywKUlNBS2V5LnByb3RvdHlwZS5kb1B1YmxpYyA9IFJTQURvUHVibGljLApSU0FLZXkucHJvdG90eXBlLnNldFB1YmxpYyA9IFJTQVNldFB1YmxpYywKUlNBS2V5LnByb3RvdHlwZS5lbmNyeXB0ID0gUlNBRW5jcnlwdDsK"
+    js = base64.b64decode(js).decode('utf-8')
+
     header = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
     }
@@ -689,16 +76,7 @@ class webvpn:
         self.twfid = twfid
 
         self.encrypt = encrypt()
-    def autoLogin(self):
-        """
-        如果twfid能用则直接使用twfid登录，否则使用用户名和密码登录
-        """
-        if self.getState():
-            self.login()
-    def login(self):
-        # 需要使用会话来保持登录状态
-        
-        header =  {
+        self.header = {
             "accept": "*/*",
             "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
             "content-type": "application/x-www-form-urlencoded",
@@ -710,9 +88,20 @@ class webvpn:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0",
             "sec-fetch-site": "same-origin"
         }
+    def autoLogin(self):
+        """
+        如果twfid能用则直接使用twfid登录，否则使用用户名和密码登录
+        """
+        if not self.getState():
+            self.login()
+            return self.getState()
+        return True
+
+    def login(self):
+        # 需要使用会话来保持登录状态
         # 第一步：获取 CSRF_RAND_CODE 和 TwfID
         url_auth = 'https://webvpn.stu.edu.cn/por/login_auth.csp?apiversion=1'
-        response_auth = self.session.get(url_auth,headers=header)
+        response_auth = self.session.get(url_auth,headers=self.header)
         if response_auth.status_code != 200:
             return "访问webvpn失败,请检查是否连接WiFi"
         xml_data = response_auth.content
@@ -732,7 +121,7 @@ class webvpn:
             'svpn_rand_code': ''  
         }
 
-        response_login = self.session.post(url_login, data=data_login,headers=header)
+        response_login = self.session.post(url_login, data=data_login,headers=self.header)
         if response_login.status_code != 200:
             return "可能多次输入错密码出现了验证码，请自己手动登录一次webvpn"
         elif response_login.text.find("锁定") != -1:
@@ -744,7 +133,7 @@ class webvpn:
             'twfid': twfid,
             'svpn_inputtoken': passkey 
         }
-        response_token = self.session.post(url_token, data=data_token,headers=header)
+        response_token = self.session.post(url_token, data=data_token,headers=self.header)
         if response_token.status_code != 200:
             return "动态口令错误，请检查key是否正确"
         cookies = self.session.cookies
@@ -753,7 +142,7 @@ class webvpn:
             if(co.name == "TWFID"):
                 cookies_v = co.value
         if cookies_v == "":
-            return("未成功获取到TWFID，请检查key是否输入正确")
+            return "未成功获取到TWFID，请检查key是否输入正确"
         self.twfid = cookies_v
         return cookies_v  
     def getState(self):
@@ -762,7 +151,74 @@ class webvpn:
             return "unexpected user service" not in r.content.decode() # 检测是否是在登录页面
         else:
             return False
+    def create_url(self,url)->str:
+        return f"https://webvpn.stu.edu.cn/portal/shortcut.html?twfid={self.twfid}&url={url}"
+
+
+def GtoM(b):
+    b = b.replace("M", "")
+    if b.find("G") != -1:
+        b = b.replace("G", "")
+        b = str(float(b) * 1024)
+    return b
+def get_data(put) -> tuple[float,float]:
+    """
+    根据流量请求包，分割流量数据
+    :param put:
+    :return:
+    """
+    data = re.findall("<tr> <td>([^<]*)</td> <td>([^<]*)", put)
+    limit = 0.0
+    now = 0.0
+    for a, b in data:
+        if a.find("流量额") != -1:
+            limit = float(GtoM(b))
+        elif a.find("当天") != -1:
+            now = float(GtoM(b))
+    return limit, now
+
+def get_vpn_url(site)->str:
+    """
+    格式：xxx://xxxx(:xxx)(/xxx)
+    """
+    if "webvpn.stu.edu.cn:8118" in site:
+        return site
+    ret = re.match("([a-zA-z]+://)([^/]*)(/.*)", site, re.I)
+    if ret is None:
+        ret = re.match("([a-zA-z]+://)([^/]*)(/.*)", site + "/", re.I)
+        if ret is None:
+            return ""
+
+    web = ret.group(2).replace('-','--').replace(".","-")
+    if ":" in web:
+        web = web.replace(":","-")+"-p"
+    web = ret.group(1)+web
+    if "https" not in web:
+        return web+".webvpn.stu.edu.cn:8118"+ret.group(3)
+    return web.replace("https","http")+"-s.webvpn.stu.edu.cn:8118"+ret.group(3)
 class wifi:
+    class state:
+        """
+        wifi的状态类
+        """
+        def __init__(self, state:str="未登录", total:float=0, used:float=0):
+            """
+            Args:
+                state: wifi的状态
+                total: 总流量/G
+                used: 已使用流量/G
+            """
+            self.state = state
+            self.total = total
+            self.used = used
+        def __str__(self):
+            return {'state' : self.state,
+                    'total' : self.total,
+                    'used' : self.used}.__str__()
+        def __repr__(self):
+            return {'state' : self.state,
+                    'total' : self.total,
+                    'used' : self.used}
     def __init__(self, name:str, password:str):
         """
         Args:
@@ -775,7 +231,7 @@ class wifi:
         self.session = requests.Session()
         self.session.trust_env =True
         self.session.verify = False
-        self.state = "未登录"
+        #self.state = "未登录"
 
         self.url = "https://a.stu.edu.cn/ac_portal/login.php"
         self.header = {
@@ -796,22 +252,52 @@ class wifi:
         r = self.session.get(self.url, headers=self.header, data=f"opr=pwdLogin&userName={self.name}&pwd={self.password}&ipv4or6=&rememberPwd=1")
         if r.status_code == 200:
             msg = r.content.decode()
-            if msg.find("logon success")!= -1 or msg.find("已在线")!=-1:
-                self.state ="登陆成功"
+            if "logon success" in msg or "已在线" in msg:
+                #self.state ="登陆成功"
                 return True
-            elif msg.find("NOAUTH")!=-1:
-                self.state = "无限流时间"
+            elif "NOAUTH" in msg:
+                #self.state = "无限流时间"
                 return True
-            elif msg.find("冻结") != -1:
-                self.state = "登陆失败，登录频繁，账户被冻结一分钟"
+            elif "冻结" in msg:
+                #self.state = "登陆失败，登录频繁，账户被冻结一分钟"
                 return False
-            else:
-                self.state = "登陆失败，可能是密码错误"
-        else:
-            self.state = "登陆失败，请检查网络连接"
+            #else:
+                #self.state = "登陆失败，可能是密码错误"
+        #else:
+            #self.state = "登陆失败，请检查网络连接"
         return False
-    def getState(self)->str:
+
+    def getState(self)-> state:
         """
         获取当前登录状态    
         """
-        return self.state
+        state = self.state()
+        r = self.session.post("https://a.stu.edu.cn/ac_portal/userflux",headers=self.header)
+        if r.status_code == 200:
+            ret = r.content.decode()
+            if "临时" in ret:
+                state.state = "无限流"
+                state.total = 999
+                state.used = 0
+            elif "请求剩余流量时出错" in ret:
+                state.state = "已登录"
+                state.total = 0
+                state.used = -1
+            else:
+                state.state = "已登录"
+                state.total,state.used = get_data(ret)
+        else:
+            state.state = "未登录"
+            state.total = 0
+            state.used = 0
+        return state
+# if __name__ == "__main__":
+#
+#     twfid = "1c1341a18a0223dd"
+#     print(twfid)
+#     #a = webvpn("","","",twfid)
+#     print(a.autoLogin())
+#     print(a.twfid)
+#     import webbrowser
+#     url = a.create_url(get_vpn_url("https://www.baidu.com"))
+#     webbrowser.open(url)
