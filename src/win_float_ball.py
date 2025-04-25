@@ -1,14 +1,16 @@
-from PySide6.QtCore import QTimer
-from qfluentwidgets import TeachingTip, TeachingTipTailPosition, RoundMenu, Action
+import os
+import webbrowser
+from functools import partial
+from PySide6.QtCore import QTimer, Signal
+from qfluentwidgets import TeachingTip, TeachingTipTailPosition, RoundMenu, Action, Dialog
 from qfluentwidgets import FluentIcon as FIF
 from ui.float_ball import UI_FloatBall
 from ui.windows.drag_window import DragWindow
-import os
-from src import touda,config
+from src import touda, config
 
+path = os.getcwd()
 class handle:
     def __init__(self):
-        path = os.getcwd()
         main = config.CfgParse(path+"/config/main.toml")
         current = config.CfgParse(path+f"/config/account_{main.get('main','current_account')}.toml")
         webvpn_name = main.get('webvpn','name')
@@ -32,10 +34,12 @@ class FloatBall(DragWindow):
         self.setCanLeftScreen(False, screen_size=screen_size)
         self.ui.waterBall.contextMenuEvent = self.waterBall_menu
         self.ui.waterBall.doubleClicked.connect(self.waterBall_double_click)
+
         #self.ui.waterBall.rightClicked.connect(self.waterBall_right_clicked)
 
         self.timer = timer()
-        awa.wifi.login()
+        self.timer.wifi_state.connect(lambda total,used : self.ui.waterBall.set_progress(((total-used)*100/total)))
+        print(awa.wifi.login())
     def waterBall_double_click(self):
         
         TeachingTip.create(self.ui.waterBall,
@@ -49,28 +53,56 @@ class FloatBall(DragWindow):
         accountMenu = RoundMenu("账号")
         linkMenu = RoundMenu("链接")
 
-        accountMenu.addActions([Action("切换到账号1", icon=FIF.CHAT, triggered=lambda: print("切换账号1")),
-                                Action("切换到账号2", icon=FIF.CHAT, triggered=lambda: print("切换账号2")),
-                                Action("切换到账号3", icon=FIF.CHAT, triggered=lambda: print("切换账号3"))])
-        
-        linkMenu.addActions([Action("打开剪贴板链接", icon=FIF.LINK, triggered=lambda: print("打开剪贴板链接")),
-                             Action("链接1", icon=FIF.LINK, triggered=lambda: print("链接1")),
-                             Action("链接2", icon=FIF.LINK, triggered=lambda: print("链接2")),
-                             Action("链接3", icon=FIF.LINK, triggered=lambda: print("链接3"))])
+        accountMenu.addActions([Action(text="切换到账号1", icon=FIF.CHAT, triggered=lambda: print("切换账号1")),
+                                Action(text="切换到账号2", icon=FIF.CHAT, triggered=lambda: print("切换账号2")),
+                                Action(text="切换到账号3", icon=FIF.CHAT, triggered=lambda: print("切换账号3"))])
+
+        self.create_links_menu(linkMenu)
         # 链接内还应加入子菜单选择类别，以及是否使用webvpn打开
         
         mainMenu.addMenu(accountMenu)
         mainMenu.addMenu(linkMenu)
         mainMenu.addSeparator()
-        mainMenu.addActions([Action("隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True)),
-                             Action("退出", icon=FIF.CLOSE, triggered=lambda: exit())])
+        mainMenu.addActions([Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True)),
+                             Action(text="退出", icon=FIF.CLOSE, triggered=lambda: exit())])
 
         mainMenu.exec(e.globalPos())
-class timer:
+    def open_link_window(self,name,link,*args):
+        w = Dialog("选择:",f"是否使用webvpn打开{name}",self)
+        if w.exec():
+            url = awa.webvpn.create_url(link)
+            webbrowser.open(url)
+        else:
+            webbrowser.open(link)
+
+    def create_links_menu(self,menu:RoundMenu):
+        """
+        添加链接菜单到菜单上
+        """
+        link_all = config.CfgParse(path+"/config/links.toml").get_all()
+
+        for link_type in link_all:
+            linkType = RoundMenu(link_type)
+            for name in link_all[link_type]:
+                link = link_all[link_type][name]
+                linkType.addAction(Action(text=name, icon=FIF.LINK, triggered=partial(self.open_link_window,name,link)))
+            menu.addMenu(linkType)
+
+class timer(QTimer):
+    wifi_state = Signal(float,float)
     def __init__(self):
-        self._timer = QTimer()
-        self._timer.timeout.connect(self.update)
-        self._timer.start(60000)
-    @staticmethod
-    def update():
-        print(1)
+        super().__init__()
+        self.timeout.connect(self.update)
+        self.start(10000)
+
+    def update(self):
+        state = awa.wifi.getState()
+        if state.state == "未登录":
+            if not awa.wifi.login():
+                return
+            else:
+                state = awa.wifi.getState()
+        print(state)
+        self.wifi_state.emit(state.total,state.used)
+
+

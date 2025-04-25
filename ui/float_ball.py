@@ -18,7 +18,7 @@ class UI_FloatBall:
 
         self.waterBall = WaterBall(100)
         self.waterBall.setFixedSize(100, 100)
-        self.waterBall.progress = 50
+        self.waterBall.progress = 100
         self.mainLayout.addWidget(self.waterBall)
         FloatBall.setLayout(self.mainLayout)
 

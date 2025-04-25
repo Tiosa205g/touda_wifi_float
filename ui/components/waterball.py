@@ -59,7 +59,7 @@ class WaterBall(QWidget):
         painter.drawEllipse(rect)
         
         # 计算水位高度（Y坐标从下往上增长）
-        water_height = (1 - self._progress / 100) * diameter
+        water_height = (self._progress / 100) * diameter
         water_level = diameter - water_height + 5
         
         # 创建波浪路径
@@ -95,7 +95,7 @@ class WaterBall(QWidget):
         font = painter.font()
         font.setPointSize(int(self.size().width()/10))
         painter.setFont(font)
-        text = f"{self._progress}%"
+        text = f"{int(self._progress)}%"
         text_rect = painter.boundingRect(rect, Qt.AlignCenter, text)
         painter.drawText(text_rect, Qt.AlignCenter, text)
         
