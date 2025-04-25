@@ -12,7 +12,17 @@ class CfgParse:
         self.path = path
         with open(path, 'r', encoding='utf-8') as f:
             self.cfg = tomlkit.load(f)
-
+    def get_all(self):
+        """
+        获取所有配置项
+        """
+        return self.cfg
+    def set_all(self,cfg):
+        """
+        设置所有配置项
+        """
+        with open(self.path, 'w', encoding='utf-8') as f:
+            tomlkit.dump(cfg, f)
     def get(self, section: str, option: str, default=None, reloaded=False):
         """
         Args:
@@ -47,5 +57,4 @@ class CfgParse:
             self.cfg.update({section: {option: value}})
         elif option not in self.cfg[section]:
             self.cfg[section].update({option: value})
-        with open(self.path, 'w', encoding='utf-8') as f:
-            tomlkit.dump(self.cfg, f)
+        self.set_all(self.cfg)

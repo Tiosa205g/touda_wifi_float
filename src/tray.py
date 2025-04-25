@@ -1,14 +1,18 @@
-from PySide6.QtWidgets import QSystemTrayIcon
+from PySide6.QtWidgets import QSystemTrayIcon, QWidget
 from qfluentwidgets import SystemTrayMenu, Action
+from sympy import false
 
+from ui.components import ProfileCard
 class Tray(QSystemTrayIcon):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setIcon(parent.windowIcon())
         self.setToolTip('Touda WiFi')
 
+        profile = ProfileCard("res/ico/favicon.ico", "xxx", "xxx@stu.edu.cn")
         self.menu = SystemTrayMenu("touda_wifi", parent=parent)
-        self.menu.addActions([Action('退出', triggered=self.quit)])
+        self.menu.addWidget(profile,selectable=false)
+        self.menu.addActions([Action(text='退出', triggered=self.quit)])
         self.activated.connect(self.toggle)
 
         self.setContextMenu(self.menu)
