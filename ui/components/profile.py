@@ -1,8 +1,8 @@
 from PySide6.QtCore import Slot
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QWidget,QHBoxLayout,QVBoxLayout
 from qfluentwidgets import AvatarWidget, BodyLabel, CaptionLabel
-
+from src.touda import wifi
 
 class ProfileCard(QWidget):
     """ Profile card """
@@ -16,25 +16,39 @@ class ProfileCard(QWidget):
         :param parent:
         """
         super().__init__(parent=parent)
-        self.avatar = AvatarWidget(avatarPath, self)
+        self.mainLayout = QHBoxLayout(self)
+        self.rightLayout = QVBoxLayout()
+
+        self.avatar = AvatarWidget(image=avatarPath)
+        self.avatar.setRadius(19)
         self.avatar.setText("汕大")
-        self.nameLabel = BodyLabel(name, self)
-        self.emailLabel = CaptionLabel(email, self)
+        self.mainLayout.addWidget(self.avatar)
+        self.mainLayout.addLayout(self.rightLayout)
+
+        self.nameLabel = BodyLabel(text=name)
+        self.emailLabel = CaptionLabel(text=email)
+        self.fluxLable = CaptionLabel(text="0.00G/0.00G")
+        self.rightLayout.addWidget(self.nameLabel)
+        self.rightLayout.addWidget(self.emailLabel)
+        self.rightLayout.addWidget(self.fluxLable)
 
         self.emailLabel.setTextColor(QColor(96, 96, 96), QColor(206, 206, 206))
 
-        self.setFixedSize(246, 66)
-        self.avatar.setRadius(19)
-        self.avatar.move(2, 5)
-        self.nameLabel.move(51, 10)
-        self.emailLabel.move(51, 26)
-    @Slot(str,str)
-    def onUpdateState(self, name: str, email: str):
+        self.setFixedSize(230, 80)
+        self.setLayout(self.mainLayout)
+
+    @Slot(wifi.state)
+    def onUpdateState(self, state:wifi.state):
         """
         切换账号
-        :param name: 名字
-        :param email: 邮箱
+        :param state: wifi.state
         :return:
         """
-        self.nameLabel.setText(name)
-        self.emailLabel.setText(email)
+        self.nameLabel.setText(state.name)
+        if state.state == "无限流":
+            self.nameLabel.setText("无限流账号")
+        if state.state == "无限流" or state.state == "未登录":
+            self.emailLabel.setText("<UNK>@stu.edu.cn")
+        else:
+            self.emailLabel.setText(state.name+"@stu.edu.cn")
+        self.fluxLable.setText(f"{state.used:.2f}G/{state.total:.2f}G")

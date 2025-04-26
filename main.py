@@ -8,7 +8,10 @@ if __name__ == '__main__':
     
     win = win_float_ball.FloatBall(app.primaryScreen().size())
     win.setWindowIcon(QIcon('res/ico/favicon.ico'))
-    tray = Tray(win)
+    win.tray = Tray(win)
+    win.bridge.wifi.state_update.connect(win.tray.profile.onUpdateState)
+    print(win.bridge.wifi.login())
+    print(win.bridge.webvpn.login())
     win.show()
 
     app.exec()
