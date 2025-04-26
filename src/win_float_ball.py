@@ -1,5 +1,6 @@
 import os
 import webbrowser
+import base64
 from functools import partial
 from PySide6.QtCore import QTimer, Signal
 from qfluentwidgets import TeachingTip, TeachingTipTailPosition, RoundMenu, Action, Dialog
@@ -14,11 +15,11 @@ class handle:
         main = config.CfgParse(path+"/config/main.toml")
         current = config.CfgParse(path+f"/config/account_{main.get('main','current_account')}.toml")
         webvpn_name = main.get('webvpn','name')
-        webvpn_password = main.get('webvpn','password')
+        webvpn_password = base64.b64decode(main.get('webvpn','password').encode('utf-8')).decode('utf-8')
         webvpn_key = main.get('webvpn','key')
         webvpn_twfid = main.get('webvpn','twfid')
         name = current.get('setting','name')
-        password = current.get('setting','password')
+        password = base64.b64decode(current.get('setting','password').encode('utf-8')).decode('utf-8')
 
         self.wifi = touda.wifi(name,password)
         self.webvpn = touda.webvpn(webvpn_name,webvpn_password,webvpn_key,webvpn_twfid)
@@ -39,7 +40,7 @@ class FloatBall(DragWindow):
 
         self.timer = timer()
         self.timer.wifi_state.connect(lambda total,used : self.ui.waterBall.set_progress(((total-used)*100/total)))
-        print(awa.wifi.login())
+        self.bridge = awa
     def waterBall_double_click(self):
         
         TeachingTip.create(self.ui.waterBall,
@@ -52,10 +53,16 @@ class FloatBall(DragWindow):
         mainMenu = RoundMenu()
         accountMenu = RoundMenu("账号")
         linkMenu = RoundMenu("链接")
-
-        accountMenu.addActions([Action(text="切换到账号1", icon=FIF.CHAT, triggered=lambda: print("切换账号1")),
-                                Action(text="切换到账号2", icon=FIF.CHAT, triggered=lambda: print("切换账号2")),
-                                Action(text="切换到账号3", icon=FIF.CHAT, triggered=lambda: print("切换账号3"))])
+        acc = []
+        curr = config.CfgParse(path+"/config/main.toml").get('main','current_account')
+        os.listdir('config')
+        for file in os.listdir('config'):
+            if 'account_' in file and '.toml' in file:
+                acc.append("config/"+file)
+                now = config.CfgParse("config/"+file)
+                name = now.get('setting','name')
+                password = base64.b64decode(now.get('setting','password').encode('utf-8')).decode('utf-8')
+                accountMenu.addAction(Action(text="切换为"+name, icon=FIF.CHAT, triggered=partial(self.change_account,name,password)))
 
         self.create_links_menu(linkMenu)
         # 链接内还应加入子菜单选择类别，以及是否使用webvpn打开
@@ -87,6 +94,17 @@ class FloatBall(DragWindow):
                 link = link_all[link_type][name]
                 linkType.addAction(Action(text=name, icon=FIF.LINK, triggered=partial(self.open_link_window,name,link)))
             menu.addMenu(linkType)
+    def change_account(self,index):
+        """
+        切换账号
+        """
+        main = config.CfgParse(path+"/config/main.toml")
+        current = config.CfgParse(path+f"/config/account_{index}.toml")
+        name = current.get('setting','name')
+        password = base64.b64decode(current.get('setting','password').encode('utf-8')).decode('utf-8')
+        main.write('main', 'current_account', index)
+        print(self.bridge.wifi.change_account(name,password))
+
 
 class timer(QTimer):
     wifi_state = Signal(float,float)

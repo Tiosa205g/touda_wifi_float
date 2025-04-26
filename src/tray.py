@@ -9,9 +9,11 @@ class Tray(QSystemTrayIcon):
         self.setIcon(parent.windowIcon())
         self.setToolTip('Touda WiFi')
 
-        profile = ProfileCard("res/ico/favicon.ico", "xxx", "xxx@stu.edu.cn")
+        self.profile = ProfileCard("res/ico/favicon.ico", "xxx", "xxx@stu.edu.cn")
+
+        # TODO : 把菜单复刻一下
         self.menu = SystemTrayMenu("touda_wifi", parent=parent)
-        self.menu.addWidget(profile,selectable=false)
+        self.menu.addWidget(self.profile,selectable=false)
         self.menu.addActions([Action(text='退出', triggered=self.quit)])
         self.activated.connect(self.toggle)
 

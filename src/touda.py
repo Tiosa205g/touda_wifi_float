@@ -6,6 +6,8 @@ import requests
 import execjs
 import re
 import base64
+
+from PySide6.QtCore import Signal,QObject
 from lxml import etree
 
 import urllib3
@@ -198,12 +200,14 @@ def get_vpn_url(site)->str:
     if "https" not in web:
         return web+".webvpn.stu.edu.cn:8118"+ret.group(3)
     return web.replace("https","http")+"-s.webvpn.stu.edu.cn:8118"+ret.group(3)
-class wifi:
+class wifi(QObject):
+
     class state:
         """
         wifi的状态类
         """
-        def __init__(self, state:str="未登录", total:float=0, used:float=0):
+
+        def __init__(self, state:str="未登录", total:float=0, used:float=0, name:str="未登录"):
             """
             Args:
                 state: wifi的状态
@@ -213,20 +217,26 @@ class wifi:
             self.state = state
             self.total = total
             self.used = used
+            self.name = name
         def __str__(self):
             return {'state' : self.state,
                     'total' : self.total,
-                    'used' : self.used}.__str__()
+                    'used' : self.used,
+                    'name':self.name}.__str__()
         def __repr__(self):
             return {'state' : self.state,
                     'total' : self.total,
-                    'used' : self.used}
+                    'used' : self.used,
+                    'name':self.name}.__repr__()
+    __state = None
+    state_update: Signal = Signal(state)
     def __init__(self, name:str, password:str):
         """
         Args:
             name: 用户名
             password: 密码
         """
+        super().__init__()
         self.name = name
         self.password = password
 
@@ -240,7 +250,6 @@ class wifi:
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0"   
         }
-
     def logout(self):
         """
         注销登录
@@ -257,6 +266,7 @@ class wifi:
     def login(self)->bool:
         self.logout()
         r = self.session.get(self.url, headers=self.header, data=f"opr=pwdLogin&userName={self.name}&pwd={self.password}&ipv4or6=&rememberPwd=1")
+        self.__state = self.getState()
         if r.status_code == 200:
             msg = r.content.decode()
             if "logon success" in msg or "已在线" in msg:
@@ -279,6 +289,8 @@ class wifi:
         获取当前登录状态    
         """
         state = self.state()
+
+
         r = self.session.post("https://a.stu.edu.cn/ac_portal/userflux",headers=self.header)
         if r.status_code == 200:
             ret = r.content.decode()
@@ -286,17 +298,21 @@ class wifi:
                 state.state = "无限流"
                 state.total = 999
                 state.used = 0
+                state.name = "<UNK>"
             elif "请求剩余流量时出错" in ret:
                 state.state = "已登录"
                 state.total = 0
                 state.used = -1
+                state.name = self.name
             else:
                 state.state = "已登录"
+                state.name = self.name
                 state.total,state.used = get_data(ret)
         else:
             state.state = "未登录"
             state.total = 0
             state.used = 0
+        self.state_update.emit(state)
         return state
 # if __name__ == "__main__":
 #
