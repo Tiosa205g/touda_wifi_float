@@ -1,6 +1,7 @@
+import sys
 from PySide6.QtWidgets import QSystemTrayIcon, QWidget
 from qfluentwidgets import SystemTrayMenu, Action
-from sympy import false
+
 
 from ui.components import ProfileCard
 class Tray(QSystemTrayIcon):
@@ -13,7 +14,7 @@ class Tray(QSystemTrayIcon):
 
         # TODO : 把菜单复刻一下
         self.menu = SystemTrayMenu("touda_wifi", parent=parent)
-        self.menu.addWidget(self.profile,selectable=false)
+        self.menu.addWidget(self.profile,selectable=False)
         self.menu.addActions([Action(text='退出', triggered=self.quit)])
         self.activated.connect(self.toggle)
 
@@ -30,5 +31,5 @@ class Tray(QSystemTrayIcon):
 
     def quit(self):
         print('quit')
-        exit()
+        sys.exit()
     

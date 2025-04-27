@@ -27,7 +27,7 @@ class ProfileCard(QWidget):
 
         self.nameLabel = BodyLabel(text=name)
         self.emailLabel = CaptionLabel(text=email)
-        self.fluxLable = CaptionLabel(text="0.00G/0.00G")
+        self.fluxLable = CaptionLabel(text="0.00Mb/0.00Mb")
         self.rightLayout.addWidget(self.nameLabel)
         self.rightLayout.addWidget(self.emailLabel)
         self.rightLayout.addWidget(self.fluxLable)
@@ -51,4 +51,4 @@ class ProfileCard(QWidget):
             self.emailLabel.setText("<UNK>@stu.edu.cn")
         else:
             self.emailLabel.setText(state.name+"@stu.edu.cn")
-        self.fluxLable.setText(f"{state.used:.2f}G/{state.total:.2f}G")
+        self.fluxLable.setText(f"{state.used:.2f}Mb/{state.total:.2f}Mb")

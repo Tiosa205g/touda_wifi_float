@@ -254,7 +254,7 @@ class wifi(QObject):
         """
         注销登录
         """
-        r = self.session.get(self.url, headers=self.header, data="opr=logout&ipv4or6=")
+        r = self.session.post(self.url, headers=self.header, data="opr=logout&ipv4or6=")
         if r.status_code == 200:
             return r.content.decode()
         else:
@@ -264,8 +264,8 @@ class wifi(QObject):
         self.password = password
         return self.login()
     def login(self)->bool:
-        self.logout()
-        r = self.session.get(self.url, headers=self.header, data=f"opr=pwdLogin&userName={self.name}&pwd={self.password}&ipv4or6=&rememberPwd=1")
+        print(self.logout())
+        r = self.session.post(self.url, headers=self.header, data=f"opr=pwdLogin&userName={self.name}&pwd={self.password}&ipv4or6=&rememberPwd=1")
         self.__state = self.getState()
         if r.status_code == 200:
             msg = r.content.decode()
@@ -293,7 +293,13 @@ class wifi(QObject):
 
         r = self.session.post("https://a.stu.edu.cn/ac_portal/userflux",headers=self.header)
         if r.status_code == 200:
-            ret = r.content.decode()
+            try:
+                ret = r.content.decode()
+            except UnicodeDecodeError:
+                state.state = "未登录"
+                state.total = 0
+                state.used = 0
+                return state
             if "临时" in ret:
                 state.state = "无限流"
                 state.total = 999
