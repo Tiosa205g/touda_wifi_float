@@ -3,13 +3,13 @@ import sys
 import webbrowser
 import base64
 from functools import partial
-from PySide6.QtCore import QTimer, Signal
-from qfluentwidgets import TeachingTip, TeachingTipTailPosition, RoundMenu, Action, Dialog
+from PySide6.QtCore import QTimer,QThread
+from qfluentwidgets import TeachingTip, RoundMenu, Action, Dialog
 from qfluentwidgets import FluentIcon as FIF
 from ui.float_ball import UI_FloatBall
 from ui.windows.drag_window import DragWindow
 from src import touda, config
-
+from src.touda import Worker
 path = os.getcwd()
 class handle:
     def __init__(self):
@@ -40,7 +40,6 @@ class FloatBall(DragWindow):
         #self.ui.waterBall.rightClicked.connect(self.waterBall_right_clicked)
 
         self.timer = timer()
-        self.timer.wifi_state.connect(lambda total,used : self.ui.waterBall.set_progress(((total-used)*100/total)))
         self.bridge = awa
     def waterBall_double_click(self):
         
@@ -101,17 +100,20 @@ class FloatBall(DragWindow):
         """
         切换账号
         """
-        main = config.CfgParse(path+"/config/main.toml")
-        if self.bridge.wifi.change_account(name,password):
+        try:
+            main = config.CfgParse(path+"/config/main.toml")
+            self.bridge.wifi.change_account(name,password)
             main.write('main', 'current_account', index)
+            print("切换账号成功")
+        except Exception as e:
+            print(f"切换账号出错{e}")
 
 
 class timer(QTimer):
-    wifi_state = Signal(float,float)
     def __init__(self):
         super().__init__()
         self.timeout.connect(self.update)
-        self.start(10000)
+        self.start(60000)
 
     def update(self):
         state = awa.wifi.getState()
@@ -121,6 +123,5 @@ class timer(QTimer):
             else:
                 state = awa.wifi.getState()
         print(state)
-        self.wifi_state.emit(state.total,state.used)
 
 
