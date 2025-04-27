@@ -54,7 +54,7 @@ def main():
         print('完成')
     elif p == '3':
         name = input('请输入账户名:')
-        password = base64.b64encode(input('请输入密码:').encode('utf-8'))
+        password = base64.b64encode(input('请输入密码:').encode('utf-8')).decode('utf-8')
         # 遍历 config目录下account_{}.toml文件的数量
         acc = []
         i = 0
@@ -89,7 +89,7 @@ def main():
     elif p == '5':
         cfg = CfgParse('config/main.toml')
         name = input('请输入账户名:')
-        password = base64.b64encode(input('请输入密码:').encode('utf-8'))
+        password = base64.b64encode(input('请输入密码:').encode('utf-8')).decode('utf-8')
         key = input('请输入密钥:')
         cfg.write('webvpn','name',name)
         cfg.write('webvpn','password',password)

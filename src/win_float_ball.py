@@ -1,4 +1,5 @@
 import os
+import sys
 import webbrowser
 import base64
 from functools import partial
@@ -44,10 +45,10 @@ class FloatBall(DragWindow):
     def waterBall_double_click(self):
         
         TeachingTip.create(self.ui.waterBall,
-                            'This is a ball','This is a ball that you can click on',
+                            'This is a ball','这都给你发现了',
                             FIF.BASKETBALL,
                             isClosable=True,
-                            duration=3000,
+                            duration=1500,
                             parent=self.ui.waterBall)
     def waterBall_menu(self,e):
         mainMenu = RoundMenu()
@@ -56,13 +57,15 @@ class FloatBall(DragWindow):
         acc = []
         curr = config.CfgParse(path+"/config/main.toml").get('main','current_account')
         os.listdir('config')
+        i = 0
         for file in os.listdir('config'):
             if 'account_' in file and '.toml' in file:
                 acc.append("config/"+file)
                 now = config.CfgParse("config/"+file)
                 name = now.get('setting','name')
                 password = base64.b64decode(now.get('setting','password').encode('utf-8')).decode('utf-8')
-                accountMenu.addAction(Action(text="切换为"+name, icon=FIF.CHAT, triggered=partial(self.change_account,name,password)))
+                accountMenu.addAction(Action(text="切换为"+name, icon=FIF.CHAT, triggered=partial(self.change_account,name,password,i)))
+                i+=1
 
         self.create_links_menu(linkMenu)
         # 链接内还应加入子菜单选择类别，以及是否使用webvpn打开
@@ -71,7 +74,7 @@ class FloatBall(DragWindow):
         mainMenu.addMenu(linkMenu)
         mainMenu.addSeparator()
         mainMenu.addActions([Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True)),
-                             Action(text="退出", icon=FIF.CLOSE, triggered=lambda: exit())])
+                             Action(text="退出", icon=FIF.CLOSE, triggered=lambda: sys.exit())])
 
         mainMenu.exec(e.globalPos())
     def open_link_window(self,name,link,*args):
@@ -94,16 +97,13 @@ class FloatBall(DragWindow):
                 link = link_all[link_type][name]
                 linkType.addAction(Action(text=name, icon=FIF.LINK, triggered=partial(self.open_link_window,name,link)))
             menu.addMenu(linkType)
-    def change_account(self,index):
+    def change_account(self,name,password,index,*args):
         """
         切换账号
         """
         main = config.CfgParse(path+"/config/main.toml")
-        current = config.CfgParse(path+f"/config/account_{index}.toml")
-        name = current.get('setting','name')
-        password = base64.b64decode(current.get('setting','password').encode('utf-8')).decode('utf-8')
-        main.write('main', 'current_account', index)
-        print(self.bridge.wifi.change_account(name,password))
+        if self.bridge.wifi.change_account(name,password):
+            main.write('main', 'current_account', index)
 
 
 class timer(QTimer):
