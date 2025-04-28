@@ -17,7 +17,7 @@ if __name__ == '__main__':
                     print('发生错误：', e)
     app = QApplication()
 
-    win = win_float_ball.FloatBall(app.primaryScreen().size())
+    win = win_float_ball.FloatBall(app.primaryScreen().size(),app)
     win.setWindowIcon(QIcon('res/ico/favicon.ico'))
     win.tray = Tray(win)
     win.bridge.wifi.state_update.connect(win.tray.profile.onUpdateState)

@@ -4,6 +4,7 @@ import webbrowser
 import base64
 from functools import partial
 from PySide6.QtCore import QTimer,QThread
+from PySide6.QtWidgets import QApplication
 from qfluentwidgets import TeachingTip, RoundMenu, Action, Dialog
 from qfluentwidgets import FluentIcon as FIF
 from ui.float_ball import UI_FloatBall
@@ -27,8 +28,9 @@ class handle:
 
 awa = handle()
 class FloatBall(DragWindow):
-    def __init__(self,screen_size):
+    def __init__(self,screen_size,app:QApplication):
         super().__init__()
+        self.app = app
         self.ui = UI_FloatBall()
         self.ui.setupUI(self)
         self.setFixedSize(self.ui.waterBall.size())
@@ -65,7 +67,7 @@ class FloatBall(DragWindow):
                 password = base64.b64decode(now.get('setting','password').encode('utf-8')).decode('utf-8')
                 accountMenu.addAction(Action(text="切换为"+name, icon=FIF.CHAT, triggered=partial(self.change_account,name,password,i)))
                 i+=1
-
+        linkMenu.addAction(Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link))
         self.create_links_menu(linkMenu)
         # 链接内还应加入子菜单选择类别，以及是否使用webvpn打开
         
@@ -76,6 +78,12 @@ class FloatBall(DragWindow):
                              Action(text="退出", icon=FIF.CLOSE, triggered=lambda: sys.exit())])
 
         mainMenu.exec(e.globalPos())
+    def open_custom_link(self):
+        """
+        剪辑板链接
+        """
+        link = self.app.clipboard().text()
+        self.open_link_window(link,link)
     def open_link_window(self,name,link,*args):
         w = Dialog("选择:",f"是否使用webvpn打开{name}",self)
         if w.exec():
@@ -110,6 +118,9 @@ class FloatBall(DragWindow):
 
 
 class timer(QTimer):
+    """
+    检查wifi登录状态
+    """
     def __init__(self):
         super().__init__()
         self.timeout.connect(self.update)
