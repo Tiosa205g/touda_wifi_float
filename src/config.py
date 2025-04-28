@@ -10,8 +10,8 @@ class CfgParse:
         :param path: str
         """
         self.path = path
-        with open(path, 'r', encoding='utf-8') as f:
-            self.cfg = tomlkit.load(f)
+        self.cfg = None
+        self.reload()
     def reload(self):
         with open(self.path, 'r', encoding='utf-8') as f:
             self.cfg = tomlkit.load(f)

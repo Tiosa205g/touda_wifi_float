@@ -1,20 +1,22 @@
 # TODO: 初始化配置，以便用户填写配置文件
 from src import CfgParse
 import os
+import sys
 import shutil
 import base64
+import pyperclip
 def main():
     welcome = '''
     1. 初始化配置文件 2. 修改WiFi账户信息
     3. 添加账户      4. 删除账户
     5. 修改webvpn账户 6. 修改链接
     7. 添加链接      8. 删除链接
+    9. 导入导出链接
     0. 退出
     请输入你的操作(数字)：'''
-    
     p = input(welcome)
     if p == '0':
-        exit()
+        sys.exit()
     elif p == '1':
         newFile = ['main', 'account_0', 'links']
         question = ['webvpn账户名','webvpn密码','webvpn密钥','wifi账户名','wifi密码']
@@ -143,6 +145,32 @@ def main():
             del link_all[link_type]
         cfg.set_all(link_all)
         print('完成')
+    elif p == '9':
+        choice = input('1. 导出链接 2. 导入链接 0. 返回\n请输入操作:')
+        if choice == '1':
+            link_type = input('请输入链接类型:')
+            links = CfgParse('config/links.toml').get_all()
+            if link_type not in links:
+                print('没有这个链接类型')
+                return
+            pyperclip.copy(base64.b64encode(str(links[link_type]).encode('utf-8')).decode('utf-8'))
+            print('已复制到剪切板')
+        elif choice == '2':
+            put = eval(base64.b64decode(input("请输入软件所导出的链接:").encode('utf-8')).decode('utf-8'))
+            links = CfgParse('config/links.toml').get_all()
+            try:
+                if type(put) != dict:
+                    print('格式错误')
+                    return
+                link_type = input('导入后的链接类型(若已存在会在以前基础上覆盖):')
+                links.update({link_type:put})
+                CfgParse('config/links.toml').set_all(links)
+                print('完成')
+            except Exception as e:
+                print('格式错误',e)
+        elif choice == '0':
+            return
+
 def none_to_other(may,other):
     if may == '':
         return other
