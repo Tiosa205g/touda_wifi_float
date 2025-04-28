@@ -3,6 +3,8 @@ import sys
 import webbrowser
 import base64
 from functools import partial
+from tarfile import LNKTYPE
+
 from PySide6.QtCore import QTimer,QThread
 from PySide6.QtWidgets import QApplication
 from qfluentwidgets import TeachingTip, RoundMenu, Action, Dialog
@@ -53,6 +55,7 @@ class FloatBall(DragWindow):
                             parent=self.ui.waterBall)
     def waterBall_menu(self,e):
         mainMenu = RoundMenu()
+
         accountMenu = RoundMenu("账号")
         linkMenu = RoundMenu("链接")
         acc = []
@@ -71,11 +74,12 @@ class FloatBall(DragWindow):
         self.create_links_menu(linkMenu)
         # 链接内还应加入子菜单选择类别，以及是否使用webvpn打开
         
-        mainMenu.addMenu(accountMenu)
+
         mainMenu.addMenu(linkMenu)
-        mainMenu.addSeparator()
-        mainMenu.addActions([Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True)),
-                             Action(text="退出", icon=FIF.CLOSE, triggered=lambda: sys.exit())])
+        mainMenu.addMenu(accountMenu)
+        # mainMenu.addSeparator()
+        # mainMenu.addActions([Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True)),
+        #                      Action(text="退出", icon=FIF.CLOSE, triggered=lambda: sys.exit())])
 
         mainMenu.exec(e.globalPos())
     def open_custom_link(self):
