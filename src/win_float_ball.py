@@ -20,6 +20,12 @@ class MyRoundMenu(RoundMenu):
         if action in self._subMenus and action.isEnabled():
             pos = self.mapToGlobal(QPoint(self.width() - 25, +30))
             action.exec(pos)
+    def mousePressEvent(self, e):
+        rect = self.geometry()
+        rect.setX(rect.x() - self.width())
+        w = self.childAt(e.pos())
+        if (w is not self.view) and (not self.view.isAncestorOf(w)) and (not rect.contains(e.globalPos())):
+            self._hideMenu(True)
 class handle:
     def __init__(self):
         main = config.CfgParse(path+"/config/main.toml")
@@ -62,7 +68,6 @@ class FloatBall(DragWindow):
                             parent=self.ui.waterBall)
     def waterBall_menu(self,pos):
         mainMenu = MyRoundMenu()
-
         accountMenu = MyRoundMenu("账号")
         linkMenu = MyRoundMenu("链接")
         acc = []
@@ -84,9 +89,8 @@ class FloatBall(DragWindow):
 
         mainMenu.addMenu(linkMenu)
         mainMenu.addMenu(accountMenu)
-        # mainMenu.addSeparator()
-        # mainMenu.addActions([Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True)),
-        #                      Action(text="退出", icon=FIF.CLOSE, triggered=lambda: sys.exit())])
+        mainMenu.addSeparator()
+        mainMenu.addAction(Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True)))
 
         mainMenu.exec(self.mapToGlobal(pos))
     def open_custom_link(self):
