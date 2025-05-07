@@ -1,4 +1,4 @@
-# TODO: 初始化配置，以便用户填写配置文件
+# TODO: 建立GUI界面设置
 from src import CfgParse
 import os
 import sys
