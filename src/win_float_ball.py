@@ -1,10 +1,11 @@
 import os
+import threading
 import webbrowser
 import base64
 from functools import partial
 from PySide6.QtCore import QTimer, QPoint
 from PySide6.QtGui import Qt
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QInputDialog
 from qfluentwidgets import TeachingTip, RoundMenu, Action, Dialog
 from qfluentwidgets import FluentIcon as FIF
 from ui.float_ball import UI_FloatBall
@@ -59,7 +60,7 @@ class FloatBall(DragWindow):
         self.timer = timer()
         self.bridge = awa
     def waterBall_double_click(self):
-        
+        # 账号具体信息状态显示
         TeachingTip.create(self.ui.waterBall,
                             'This is a ball','这都给你发现了',
                             FIF.BASKETBALL,
@@ -100,7 +101,35 @@ class FloatBall(DragWindow):
         link = self.app.clipboard().text()
         self.open_link_window(link,link)
     def open_link_window(self,name,link,*args):
+        if "live" in link and "bilibili" in link:
+            a = Dialog("匹配到bilibili直播链接",f"是否使用使用解析打开{name}",self)
+            a.yesButton.setText("是")
+            a.cancelButton.setText("否")
+            if a.exec():
+                awa.webvpn.autoLogin()
+                bilibili = touda.live_bilibili(awa.webvpn.twfid)
+                url = bilibili.get_live_url(link)
+                if len(url) > 0:
+                    short_url = []
+                    hash_put = {}
+                    for i,x in enumerate(url) :
+                        short_url.append(x[:30]+str(i))
+                        hash_put.update({short_url[-1]:x})
+
+                    item,ok = QInputDialog.getItem(self,
+                                                   "选择视频地址",
+                                                      "请选择",
+                                                   short_url,
+                                                   0,
+                                                   editable=False)
+                    if ok:
+                        url = "http://hlsplayer-net-s.webvpn.stu.edu.cn:8118/embed?type=m3u8&src=" + hash_put[item]
+                        webbrowser.open(url)
+
+                return
         w = Dialog("选择:",f"是否使用webvpn打开{name}",self)
+        w.yesButton.setText("是")
+        w.cancelButton.setText("否")
         if w.exec():
             url = awa.webvpn.create_url(link)
             webbrowser.open(url)

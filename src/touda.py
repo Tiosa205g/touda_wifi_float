@@ -167,6 +167,7 @@ class webvpn:
         if cookies_v == "":
             return "未成功获取到TWFID，请检查key是否输入正确"
         self.twfid = cookies_v
+
         return cookies_v  
     def getState(self):
         r = self.session.get("https://webvpn.stu.edu.cn/por/conf.csp?apiversion=1",headers=self.header)
@@ -218,6 +219,10 @@ def get_vpn_url(site)->str:
     if "https" not in web:
         return web+".webvpn.stu.edu.cn:8118"+ret.group(3)
     return web.replace("https","http")+"-s.webvpn.stu.edu.cn:8118"+ret.group(3)
+def extract_text(text, start_marker, end_marker):
+    pattern = re.compile(fr'{re.escape(start_marker)}(.*?){re.escape(end_marker)}', re.DOTALL)
+    match = pattern.search(text)
+    return match.group(1).strip() if match else None
 class wifi(QObject):
 
     class state:
@@ -353,3 +358,42 @@ class wifi(QObject):
 #     import webbrowser
 #     url = a.create_url(get_vpn_url("https://www.baidu.com"))
 #     webbrowser.open(url)
+class live_bilibili:
+    def __init__(self, twfid:str=""):
+        """
+        Args:
+            twfid: TWFID
+        """
+        self.session = requests.Session()
+        self.session.trust_env =True
+        self.session.verify = False
+        self.twfid = twfid
+        self.header = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36"
+        }
+
+    def set_twfid(self,twfid:str):
+        self.twfid = twfid
+
+    def get_live_url(self,bili_url:str)->list:
+        url = []
+        res = self.session.get(
+            bili_url,
+            verify=False, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36"},
+            cookies={"TWFID": self.twfid}, timeout=3000)
+
+        if res.status_code == 200:
+            print("请求成功！")
+            data = res.content.decode()
+            j = json.loads(extract_text(data, 'window.__NEPTUNE_IS_MY_WAIFU__=', '</script>'))
+            streams = j['roomInitRes']['data']['playurl_info']['playurl']['stream']
+
+            for i, stream in enumerate(streams):
+                for j, format_in in enumerate(stream['format']):
+                    for k, codec in enumerate(format_in['codec']):
+                        for l, url_info in enumerate(codec['url_info']):
+                            url.append(url_info['host'] + codec['base_url'] + url_info['extra'])
+                            #print(f"第{len(url)}个视频地址：http://hlsplayer-net-s.webvpn.stu.edu.cn:8118/embed?type=m3u8&src={url[-1]}")
+
+        return url
