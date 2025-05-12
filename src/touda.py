@@ -79,7 +79,8 @@ class encrypt:
         ctx = execjs.compile(self.js)
         result = ctx.call("getkey",id)
         return result
-class webvpn:
+class webvpn(QObject):
+    twfid_update:Signal = Signal(str)
     def __init__(self, name:str, password:str, key:str,twfid=""):
         """
         Args:
@@ -88,6 +89,7 @@ class webvpn:
             key: 动态口令秘钥
             twfid: 如果有twfid则不需要登录，直接使用twfid进行登录
         """
+        super().__init__()
         self.session = requests.Session()
         self.session.trust_env =True
         self.session.verify = False
@@ -167,7 +169,7 @@ class webvpn:
         if cookies_v == "":
             return "未成功获取到TWFID，请检查key是否输入正确"
         self.twfid = cookies_v
-
+        self.twfid_update.emit(self.twfid)
         return cookies_v  
     def getState(self):
         r = self.session.get("https://webvpn.stu.edu.cn/por/conf.csp?apiversion=1",headers=self.header)
