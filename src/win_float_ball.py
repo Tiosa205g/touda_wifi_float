@@ -40,6 +40,7 @@ class handle:
 
         self.wifi = touda.wifi(name,password)
         self.webvpn = touda.webvpn(webvpn_name,webvpn_password,webvpn_key,webvpn_twfid)
+        self.webvpn.twfid_update.connect(lambda twfid:main.write('webvpn','twfid',twfid))
 
 awa = handle()
 class FloatBall(DragWindow):
@@ -67,8 +68,8 @@ class FloatBall(DragWindow):
                             isClosable=True,
                             duration=1500,
                             parent=self.ui.waterBall)
-    def waterBall_menu(self,pos):
-        mainMenu = MyRoundMenu()
+    def waterBall_menu(self,pos,ret:bool=False):
+        self.mainMenu = MyRoundMenu()
         accountMenu = MyRoundMenu("账号")
         linkMenu = MyRoundMenu("链接")
         acc = []
@@ -88,12 +89,12 @@ class FloatBall(DragWindow):
         # 链接内还应加入子菜单选择类别，以及是否使用webvpn打开
         
 
-        mainMenu.addMenu(linkMenu)
-        mainMenu.addMenu(accountMenu)
-        mainMenu.addSeparator()
-        mainMenu.addAction(Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True)))
+        self.mainMenu.addMenu(linkMenu)
+        self.mainMenu.addMenu(accountMenu)
+        self.mainMenu.addSeparator()
+        self.mainMenu.addAction(Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True)))
 
-        mainMenu.exec(self.mapToGlobal(pos))
+        self.mainMenu.exec(self.mapToGlobal(pos))
     def open_custom_link(self):
         """
         剪辑板链接
