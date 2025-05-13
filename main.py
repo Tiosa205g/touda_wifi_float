@@ -1,3 +1,5 @@
+import time
+
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from src.touda import Worker
@@ -6,6 +8,7 @@ from src import win_float_ball
 from src import Tray
 import sys
 import init
+
 if __name__ == '__main__':
     argv = sys.argv
     if len(argv) == 2:
@@ -25,9 +28,9 @@ if __name__ == '__main__':
 
     handle_thread = QThread()
     wifi_worker = Worker(win.bridge.wifi.login)
-    webvpn_worker = Worker(win.bridge.webvpn.login)
-    wifi_worker.finished.connect(lambda x: print(x))
-    webvpn_worker.finished.connect(lambda x: print(x))
+    webvpn_worker = Worker(win.bridge.webvpn.autoLogin)
+    wifi_worker.finished.connect(lambda x: print(f"校园网登录：{x}"))
+    webvpn_worker.finished.connect(lambda x: print(f"webvpn登录：{x}"))
     wifi_worker.moveToThread(handle_thread)
     webvpn_worker.moveToThread(handle_thread)
     handle_thread.started.connect(wifi_worker.run_task)

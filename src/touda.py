@@ -170,12 +170,22 @@ class webvpn(QObject):
             return "未成功获取到TWFID，请检查key是否输入正确"
         self.twfid = cookies_v
         self.twfid_update.emit(self.twfid)
+        #print(f"登录成功，TWFID: {self.twfid}, 页面：{response_auth.content.decode()}")
         return cookies_v  
     def getState(self):
         r = self.session.get("https://webvpn.stu.edu.cn/por/conf.csp?apiversion=1",headers=self.header)
+        #print(r.content.decode())
         if r.status_code == 200:
-            return "unexpected user service" not in r.content.decode() # 检测是否是在登录页面
+            ret = "unexpected user service" not in r.content.decode() # 检测是否是在登录页面
+            if not ret:
+                self.session.cookies.clear_session_cookies()
+                self.twfid = ""
+                self.twfid_update.emit(self.twfid)
+            return ret
         else:
+            self.session.cookies.clear_session_cookies()
+            self.twfid = ""
+            self.twfid_update.emit(self.twfid)
             return False
     def create_url(self,url)->str:
         if not self.getState():
@@ -290,7 +300,7 @@ class wifi(QObject):
         self.password = password
         return self.login()
     def login(self)->bool:
-        print(self.logout())
+        print(f"校园网注销:{self.logout()}")
         r = self.session.post(self.url, headers=self.header, data=f"opr=pwdLogin&userName={self.name}&pwd={self.password}&ipv4or6=&rememberPwd=1")
         self.__state = self.getState()
         if r.status_code == 200:
