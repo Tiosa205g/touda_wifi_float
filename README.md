@@ -32,3 +32,4 @@
     - name:webvpn用户名(str) 
     - password:webvpn密码(str/base64编码)
     - key:webvpn密钥(str)
+    - twfid:webvpn校验登录状态的cookie(str)

@@ -1,0 +1,7 @@
+# 忽略 Python 编译生成的文件
+*.pyc
+
+# 忽略所有 .toml 文件
+*.toml
+
+*.exe

@@ -178,6 +178,6 @@ class timer(QTimer):
                 return
             else:
                 state = awa.wifi.getState()
-        print(state)
+        print(f"校园网状态：{state}")
 
 
