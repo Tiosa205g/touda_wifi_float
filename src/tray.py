@@ -30,7 +30,7 @@ class Tray(QSystemTrayIcon):
 
         self.show()
 
-        print('Tray created')
+        print('托盘创建完毕')
 
     def toggle(self, reason):
         
