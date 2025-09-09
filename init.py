@@ -1,4 +1,3 @@
-# TODO: 建立GUI界面设置
 from src import CfgParse
 import os
 import sys
