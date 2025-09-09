@@ -29,18 +29,18 @@ class MyRoundMenu(RoundMenu):
             self._hideMenu(True)
 class handle:
     def __init__(self):
-        main = config.CfgParse(path+"/config/main.toml")
-        current = config.CfgParse(path+f"/config/account_{main.get('main','current_account')}.toml")
-        webvpn_name = main.get('webvpn','name')
-        webvpn_password = base64.b64decode(main.get('webvpn','password').encode('utf-8')).decode('utf-8')
-        webvpn_key = main.get('webvpn','key')
-        webvpn_twfid = main.get('webvpn','twfid')
-        name = current.get('setting','name')
-        password = base64.b64decode(current.get('setting','password').encode('utf-8')).decode('utf-8')
+        self.main = config.CfgParse(path+"/config/main.toml")
+        self.current = config.CfgParse(path+f"/config/account_{self.main.get('main','current_account')}.toml")
+        webvpn_name = self.main.get('webvpn','name')
+        webvpn_password = base64.b64decode(self.main.get('webvpn','password').encode('utf-8')).decode('utf-8')
+        webvpn_key = self.main.get('webvpn','key')
+        webvpn_twfid = self.main.get('webvpn','twfid')
+        name = self.current.get('setting','name')
+        password = base64.b64decode(self.current.get('setting','password').encode('utf-8')).decode('utf-8')
 
         self.wifi = touda.wifi(name,password)
         self.webvpn = touda.webvpn(webvpn_name,webvpn_password,webvpn_key,webvpn_twfid)
-        self.webvpn.twfid_update.connect(lambda twfid:main.write('webvpn','twfid',twfid))
+        self.webvpn.twfid_update.connect(lambda twfid:self.main.write('webvpn','twfid',twfid))
 
 awa = handle()
 class FloatBall(DragWindow):
@@ -57,9 +57,13 @@ class FloatBall(DragWindow):
         self.ui.waterBall.doubleClicked.connect(self.waterBall_double_click)
 
         #self.ui.waterBall.rightClicked.connect(self.waterBall_right_clicked)
-
+        
         self.timer = timer()
+        self.timer.win = self
         self.bridge = awa
+        
+        x,y=self.bridge.main.get('main','x',0),self.bridge.main.get('main','y',0) #设置初始位置为上一次关闭位置
+        self.move(x,y)
     def waterBall_double_click(self):
         # 账号具体信息状态显示
         TeachingTip.create(self.ui.waterBall,

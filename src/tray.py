@@ -18,7 +18,6 @@ class Tray(QSystemTrayIcon):
 
         self.profile = ProfileCard("res/ico/favicon.ico", "xxx", "xxx@stu.edu.cn")
 
-        # TODO : 把菜单复刻一下
         self.menu = SystemTrayMenu("touda_wifi", parent=parent)
         self.menu.addWidget(self.profile,selectable=False)
 
@@ -39,6 +38,11 @@ class Tray(QSystemTrayIcon):
             self.parent().setHidden(not self.parent().isHidden())
 
     def quit(self):
+        #TODO： 记录位置
+        x,y=self.parent().geometry().x(),self.parent().geometry().y()
+        mainc = config.CfgParse(os.getcwd()+"/config/main.toml")
+        mainc.write('main','x',x)
+        mainc.write('main','y',y)
         print('quit')
         sys.exit()
 
