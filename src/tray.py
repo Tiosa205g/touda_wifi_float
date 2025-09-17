@@ -20,7 +20,7 @@ class Tray(QSystemTrayIcon):
 
         self.menu = SystemTrayMenu("touda_wifi", parent=parent)
         self.menu.addWidget(self.profile,selectable=False)
-
+        self.menu.aboutToShow.connect(self.onMenuShow)
         self.menu.addActions([Action(text='退出', triggered=self.quit)])
         self.activated.connect(self.toggle)
 
@@ -30,7 +30,9 @@ class Tray(QSystemTrayIcon):
         self.show()
 
         print('托盘创建完毕')
-
+    def onMenuShow(self):
+        self.menu.setFocus()
+        print("托盘菜单已打开")
     def toggle(self, reason):
         
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
@@ -38,7 +40,6 @@ class Tray(QSystemTrayIcon):
             self.parent().setHidden(not self.parent().isHidden())
 
     def quit(self):
-        #TODO： 记录位置
         x,y=self.parent().geometry().x(),self.parent().geometry().y()
         mainc = config.CfgParse(os.getcwd()+"/config/main.toml")
         mainc.write('main','x',x)
