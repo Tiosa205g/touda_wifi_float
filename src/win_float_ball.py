@@ -76,6 +76,7 @@ class FloatBall(DragWindow):
         self.mainMenu = MyRoundMenu()
         accountMenu = MyRoundMenu("账号")
         linkMenu = MyRoundMenu("链接")
+        webvpnMenu = MyRoundMenu("webvpn相关")
         acc = []
         curr = config.CfgParse(path+"/config/main.toml").get('main','current_account')
         i = 0
@@ -88,23 +89,51 @@ class FloatBall(DragWindow):
                 accountMenu.addAction(Action(text="切换为"+name, icon=FIF.CHAT, triggered=partial(self.change_account,name,password,i)))
                 i+=1
 
-        linkMenu.addAction(Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link))
+        # linkMenu.addAction(Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link))
+        # 移入webvpn相关
         self.create_links_menu(linkMenu)
         # 链接内还应加入子菜单选择类别，以及是否使用webvpn打开
-        
+
+        webvpnMenu.addActions([Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link),
+                               Action(text="复制一键登录链接", icon=FIF.ACCEPT,triggered=self.copy_login_link),
+                               Action(text="复制6位口令",icon=FIF.VPN,triggered=self.copy_totp),
+                               Action(text="复制twfid",icon=FIF.CODE,triggered=self.copy_twfid)])
 
         self.mainMenu.addMenu(linkMenu)
+        self.mainMenu.addMenu(webvpnMenu)
         self.mainMenu.addMenu(accountMenu)
-        self.mainMenu.addSeparator()
+        
+        self.mainMenu.addSeparator() #分割线
+
         self.mainMenu.addAction(Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True)))
 
         self.mainMenu.exec(self.mapToGlobal(pos))
     def open_custom_link(self):
         """
-        剪辑板链接
+            剪辑板链接
         """
         link = self.app.clipboard().text()
         self.open_link_window(link,link)
+    def copy_login_link(self):
+        """
+            复制一键登录webvpn的链接，不限设备
+        """
+        link = self.bridge.webvpn.create_redirect_url("https://webvpn.stu.edu.cn/")
+        self.app.clipboard().setText(link)
+    def copy_totp(self):
+        """
+            复制6位totp口令
+        """
+        key = self.bridge.webvpn.key
+        totp = self.bridge.webvpn.encrypt.gettotpkey(key)
+        self.app.clipboard().setText(totp)
+    def copy_twfid(self):
+        """
+            复制用于登录的twfid
+        """
+        self.bridge.webvpn.autoLogin()
+        twfid = self.bridge.webvpn.twfid
+        self.app.clipboard().setText(twfid)
     def open_link_window(self,name,link,*args):
         if "live" in link and "bilibili" in link:
             a = Dialog("匹配到bilibili直播链接",f"是否使用使用解析打开{name}",self)

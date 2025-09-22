@@ -7,7 +7,7 @@ from src.touda import wifi
 class ProfileCard(QWidget):
     """ Profile card """
 
-    def __init__(self, avatarPath: str, name: str, email: str, parent=None):
+    def __init__(self, avatarPath: str, name: str, email: str, version: str, parent=None):
         """
 
         :param avatarPath: 头像图片路径
@@ -18,6 +18,7 @@ class ProfileCard(QWidget):
         super().__init__(parent=parent)
         self.mainLayout = QHBoxLayout(self)
         self.rightLayout = QVBoxLayout()
+        self.righttopLayout = QHBoxLayout()
 
         self.avatar = AvatarWidget(image=avatarPath)
         self.avatar.setRadius(19)
@@ -27,13 +28,20 @@ class ProfileCard(QWidget):
 
         self.nameLabel = BodyLabel(text=name)
         self.emailLabel = CaptionLabel(text=email)
+        self.versionLabel = CaptionLabel(text=version)
         self.fluxLable = CaptionLabel(text="0.00Mb/0.00Mb")
-        self.rightLayout.addWidget(self.nameLabel)
+
+        self.righttopLayout.addWidget(self.nameLabel)
+        self.righttopLayout.addWidget(self.versionLabel)
+        self.rightLayout.addLayout(self.righttopLayout)
         self.rightLayout.addWidget(self.emailLabel)
         self.rightLayout.addWidget(self.fluxLable)
 
-        self.emailLabel.setTextColor(QColor(96, 96, 96), QColor(206, 206, 206))
-
+        font = self.versionLabel.font()
+        font.setItalic(True)
+        self.versionLabel.setFont(font) #设置斜体
+        self.emailLabel.setTextColor(QColor(96, 96, 96), QColor(206, 206, 206)) #浅灰色
+        
         self.setFixedSize(230, 80)
         self.setLayout(self.mainLayout)
 

@@ -189,10 +189,20 @@ class webvpn(QObject):
             self.twfid = ""
             self.twfid_update.emit(self.twfid)
             return False
-    def create_url(self,url)->str:
+    def create_url(self,url:str)->str:
+        """
+            创建webvpn访问链接
+        """
         if not self.getState():
             self.login()
         return f"https://webvpn.stu.edu.cn/portal/shortcut.html?twfid={self.twfid}&url={get_vpn_url(url)}"
+    def create_redirect_url(self,url:str)->str:
+        """
+            用webvpn重定向访问链接
+        """
+        if not self.getState():
+            self.login()
+        return f"https://webvpn.stu.edu.cn/portal/shortcut.html?twfid={self.twfid}&url={url}"
 def GtoM(b):
     b = b.replace("M", "")
     if b.find("G") != -1:

@@ -11,12 +11,12 @@ from src.win_float_ball import MyRoundMenu
 from ui.components import ProfileCard
 path = os.getcwd()
 class Tray(QSystemTrayIcon):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None,version:str="v1.0.0"):
         super().__init__(parent=parent)
         self.setIcon(parent.windowIcon())
         self.setToolTip('Touda WiFi')
 
-        self.profile = ProfileCard("res/ico/favicon.ico", "xxx", "xxx@stu.edu.cn")
+        self.profile = ProfileCard("res/ico/favicon.ico", "xxx", "xxx@stu.edu.cn",version)
 
         self.menu = SystemTrayMenu("touda_wifi", parent=parent)
         self.menu.addWidget(self.profile,selectable=False)
