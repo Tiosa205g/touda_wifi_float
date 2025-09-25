@@ -89,12 +89,12 @@ class FloatBall(DragWindow):
                 accountMenu.addAction(Action(text="切换为"+name, icon=FIF.CHAT, triggered=partial(self.change_account,name,password,i)))
                 i+=1
 
-        # linkMenu.addAction(Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link))
+        linkMenu.addAction(Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link))
         # 移入webvpn相关
         self.create_links_menu(linkMenu)
         # 链接内还应加入子菜单选择类别，以及是否使用webvpn打开
 
-        webvpnMenu.addActions([Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link),
+        webvpnMenu.addActions([#Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link),
                                Action(text="复制一键登录链接", icon=FIF.ACCEPT,triggered=self.copy_login_link),
                                Action(text="复制6位口令",icon=FIF.VPN,triggered=self.copy_totp),
                                Action(text="复制twfid",icon=FIF.CODE,triggered=self.copy_twfid)])
