@@ -22,6 +22,10 @@
    "value": "D:/Source/Python/touda_wifi_float/res/ico/favicon.ico"
   },
   {
+   "optionDest": "upx_dir",
+   "value": "D:/upx-5.0.2-win64"
+  },
+  {
    "optionDest": "clean_build",
    "value": false
   },
