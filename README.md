@@ -11,6 +11,8 @@
 8. pyotp
 9. nuitka(打包工具-可选)
 10. auto-py-to-exe(打包工具-可选)
+
+输入pip install -r requirements.txt 即可
 ## 日志:
 - 25.3.17:建仓
 - 鸽子

@@ -1,11 +1,4 @@
-import time
 
-from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication
-from src.touda import Worker
-from PySide6.QtCore import QThread
-from src import win_float_ball
-from src import Tray
 import sys
 import init
 
@@ -35,6 +28,13 @@ if __name__ == '__main__':
                     init.main()
                 except Exception as e:
                     print('发生错误：', e)
+    
+    from PySide6.QtGui import QIcon
+    from PySide6.QtWidgets import QApplication
+    from src.touda import Worker
+    from PySide6.QtCore import QThread
+    from src import win_float_ball
+    from src.tray import Tray
     app = QApplication()
 
     win = win_float_ball.FloatBall(app.primaryScreen().size(),app)
