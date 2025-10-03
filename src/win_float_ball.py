@@ -96,6 +96,7 @@ class FloatBall(DragWindow):
 
         webvpnMenu.addActions([#Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link),
                                Action(text="复制一键登录链接", icon=FIF.ACCEPT,triggered=self.copy_login_link),
+                               Action(text="转换剪贴板链接",icon=FIF.LABEL,triggered=self.clipboard_convert_webvpn),
                                Action(text="复制6位口令",icon=FIF.VPN,triggered=self.copy_totp),
                                Action(text="复制twfid",icon=FIF.CODE,triggered=self.copy_twfid)])
 
@@ -108,6 +109,39 @@ class FloatBall(DragWindow):
         self.mainMenu.addAction(Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True)))
 
         self.mainMenu.exec(self.mapToGlobal(pos))
+    def clipboard_convert_webvpn(self):
+        import re
+        count = 0
+        convert_count = 0
+
+        cb = self.app.clipboard()
+        site = cb.text()
+        
+        # ([a-zA-z]+://)([^/]*)(/.*)
+        it = re.finditer('(https?://)(.*)(/.*)', site,re.I)
+
+        for match in it:
+            all = match.group()
+            protocol = match.group(1)
+            domain = match.group(2)
+            args = match.group(3)
+
+            count += 1
+
+            if "webvpn.stu.edu.cn:8118" in all:
+                continue
+
+            web = domain.replace('-','--').replace(".","-")
+            if ":" in web:
+                web = web.replace(":","-")+"-p"
+            web = protocol + web
+            if "https" not in web:
+                site = site.replace(all, web + ".webvpn.stu.edu.cn:8118" + args, 1) # http
+            else:
+                site = site.replace(all, web.replace("https","http") + "-s.webvpn.stu.edu.cn:8118" + args, 1) # https
+            convert_count += 1
+        cb.setText(site)
+        print(f"转换结果: 共识别到{count}个链接,成功修改{convert_count}个链接")
     def open_custom_link(self):
         """
             剪辑板链接
