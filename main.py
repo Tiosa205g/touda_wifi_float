@@ -2,7 +2,7 @@
 import sys
 import init
 
-VERSION = "v1.1.1"
+VERSION = "v1.1.2"
 
 
 
