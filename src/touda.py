@@ -13,6 +13,7 @@ from lxml import etree
 
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from src.logging_config import logger
 class Worker(QObject):
     finished = Signal(Any)  # 任务完成信号
     started = Signal()  # 进度更新信号
@@ -56,14 +57,13 @@ class encrypt:
         elif method == 1:
             # 接口
             try:
-                res = requests.post("http://www.2fafb.com/api/jiekou.php",data={"tok":key},headers=self.header)
+                res = requests.post("http://www.2fafb.com/api/jiekou.php",data={"tok":key},headers=self.header, timeout=10)
                 if res.status_code != 200:
                     return "000000"
                 data = json.loads(res.text)
-                #print(data)
                 return data['data']
-            except Exception as e:
-                print(e)
+            except Exception:
+                logger.exception('gettotpkey 请求失败')
                 return "000000"
         else:
             return "000000"
@@ -172,8 +172,8 @@ class webvpn(QObject):
             return "未成功获取到TWFID，请检查key是否输入正确"
         self.twfid = cookies_v
         self.twfid_update.emit(self.twfid)
-        print(f"登录成功，TWFID: {self.twfid}")
-        return cookies_v  
+        logger.info(f"登录成功，TWFID: {self.twfid}")
+        return cookies_v
     def getState(self):
         r = self.session.get("https://webvpn.stu.edu.cn/por/conf.csp?apiversion=1",headers=self.header)
         #print(r.content.decode())
@@ -312,8 +312,8 @@ class wifi(QObject):
         self.password = password
         return self.login()
     def login(self)->bool:
-        print(f"校园网注销:{self.logout()}")
-        r = self.session.post(self.url, headers=self.header, data=f"opr=pwdLogin&userName={self.name}&pwd={self.password}&ipv4or6=&rememberPwd=1")
+        logger.info(f"校园网注销:{self.logout()}")
+        r = self.session.post(self.url, headers=self.header, data=f"opr=pwdLogin&userName={self.name}&pwd={self.password}&ipv4or6=&rememberPwd=1", timeout=10)
         self.__state = self.getState()
         if r.status_code == 200:
             msg = r.content.decode()
@@ -408,7 +408,7 @@ class live_bilibili:
             cookies={"TWFID": self.twfid}, timeout=3000)
 
         if res.status_code == 200:
-            print("请求成功！")
+            logger.info("请求成功！")
             data = res.content.decode()
             j = json.loads(extract_text(data, 'window.__NEPTUNE_IS_MY_WAIFU__=', '</script>'))
             streams = j['roomInitRes']['data']['playurl_info']['playurl']['stream']

@@ -8,6 +8,7 @@ from qfluentwidgets import SystemTrayMenu, Action
 from qfluentwidgets import FluentIcon as FIF
 from src import config
 from src.win_float_ball import MyRoundMenu
+from src.logging_config import logger
 from ui.components import ProfileCard
 path = os.getcwd()
 class Tray(QSystemTrayIcon):
@@ -28,15 +29,14 @@ class Tray(QSystemTrayIcon):
         self.setContextMenu(self.menu)
 
         self.show()
-
-        print('托盘创建完毕')
+        logger.info('托盘创建完毕')
     def onMenuShow(self):
         self.menu.setFocus()
-        print("托盘菜单已打开")
+        logger.info("托盘菜单已打开")
     def toggle(self, reason):
         
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
-            print('toggle')
+            logger.info('toggle')
             self.parent().setHidden(not self.parent().isHidden())
 
     def quit(self):
@@ -44,7 +44,7 @@ class Tray(QSystemTrayIcon):
         mainc = config.CfgParse(os.getcwd()+"/config/main.toml")
         mainc.write('main','x',x)
         mainc.write('main','y',y)
-        print('quit')
+        logger.info('quit')
         sys.exit()
 
 

@@ -3,7 +3,7 @@ import threading
 import webbrowser
 import base64
 from functools import partial
-from PySide6.QtCore import QTimer, QPoint
+from PySide6.QtCore import QTimer, QPoint, QThread
 from PySide6.QtGui import Qt
 from PySide6.QtWidgets import QApplication, QInputDialog
 from qfluentwidgets import TeachingTip, RoundMenu, Action, Dialog
@@ -12,6 +12,7 @@ from ui.float_ball import UI_FloatBall
 from ui.windows.drag_window import DragWindow
 from src import touda, config
 from src.touda import Worker
+from src.logging_config import logger
 path = os.getcwd()
 class MyRoundMenu(RoundMenu):
     # 重写方法加入点击打开子菜单
@@ -141,7 +142,7 @@ class FloatBall(DragWindow):
                 site = site.replace(all, web.replace("https","http") + "-s.webvpn.stu.edu.cn:8118" + args, 1) # https
             convert_count += 1
         cb.setText(site)
-        print(f"转换结果: 共识别到{count}个链接,成功修改{convert_count}个链接")
+        logger.info(f"转换结果: 共识别到{count}个链接,成功修改{convert_count}个链接")
     def open_custom_link(self):
         """
             剪辑板链接
@@ -224,9 +225,9 @@ class FloatBall(DragWindow):
             main = config.CfgParse(path+"/config/main.toml")
             self.bridge.wifi.change_account(name,password)
             main.write('main', 'current_account', index)
-            print("切换账号成功")
+            logger.info("切换账号成功")
         except Exception as e:
-            print(f"切换账号出错{e}")
+            logger.exception(f"切换账号出错: {e}")
 
 
 class timer(QTimer):
@@ -237,14 +238,50 @@ class timer(QTimer):
         super().__init__()
         self.timeout.connect(self.update)
         self.start(60000)
+        # 是否有一次检查正在进行，避免并发
+        self._running = False
 
     def update(self):
-        state = awa.wifi.getState()
-        if state.state == "未登录":
-            if not awa.wifi.login():
-                return
-            else:
+        # 如果上一次检查尚未完成，则跳过本次定时
+        if getattr(self, '_running', False):
+            return
+
+        def check_wifi():
+            try:
                 state = awa.wifi.getState()
-        print(f"校园网状态：{state}")
+                if state.state == "未登录":
+                    # 尝试登录一次（可能会阻塞，但运行在子线程）
+                    awa.wifi.login()
+                    state = awa.wifi.getState()
+                return state
+            except Exception as e:
+                # 在子线程记录异常并返回 None
+                logger.exception(f"check_wifi 异常: {e}")
+                return None
+
+        # 在独立线程中运行检查，使用现有 Worker
+        thread = QThread()
+        worker = Worker(check_wifi)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run_task)
+
+        # 开始前设置运行标志
+        self._running = True
+
+        def _on_finished(result):
+            try:
+                if result is None:
+                    logger.warning("校园网状态检查失败")
+                else:
+                    logger.info(f"校园网状态：{result}")
+            finally:
+                # 清理并允许下一次检查
+                self._running = False
+
+        worker.finished.connect(_on_finished)
+        worker.finished.connect(worker.deleteLater)
+        worker.finished.connect(thread.quit)
+        thread.finished.connect(thread.deleteLater)
+        thread.start()
 
 

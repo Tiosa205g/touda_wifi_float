@@ -3,5 +3,5 @@
 
 # 忽略所有 .toml 文件
 *.toml
-
+*.log
 *.exe
