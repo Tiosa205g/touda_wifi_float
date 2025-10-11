@@ -26,11 +26,25 @@ class Worker(QObject):
         self.started.emit()
         if self.run_on_start is not None:
             self.run_on_start()
+        # 捕获运行时异常，避免子线程抛出未捕获异常导致程序意外退出
+        try:
+            ret = self.run()
+        except Exception as e:
+            # 在子线程中记录异常并将异常对象作为结果发出，
+            # 主线程收到后可决定如何处理（记录/忽略/提示）
+            from src.logging_config import logger
+            logger.exception(f"Worker task 异常: {e}")
+            ret = e
 
-        ret = self.run()
+        try:
+            if self.run_on_finish is not None:
+                self.run_on_finish()
+        except Exception:
+            # 确保 run_on_finish 的异常不会阻止 finished 信号发射
+            from src.logging_config import logger
+            logger.exception("Worker run_on_finish 异常")
 
-        if self.run_on_finish is not None:
-            self.run_on_finish()
+        # 无论是否发生异常，都发射 finished 信号
         self.finished.emit(ret)
 class encrypt:
     # base64解码js

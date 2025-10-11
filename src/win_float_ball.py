@@ -260,10 +260,11 @@ class timer(QTimer):
                 return None
 
         # 在独立线程中运行检查，使用现有 Worker
-        thread = QThread()
-        worker = Worker(check_wifi)
-        worker.moveToThread(thread)
-        thread.started.connect(worker.run_task)
+        # 使用self.thread和self.worker避免被垃圾回收
+        self.thread = QThread()
+        self.worker = Worker(check_wifi)
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run_task)
 
         # 开始前设置运行标志
         self._running = True
@@ -273,15 +274,15 @@ class timer(QTimer):
                 if result is None:
                     logger.warning("校园网状态检查失败")
                 else:
-                    logger.info(f"校园网状态：{result}")
+                    logger.info(f"校园网状态更新：{result}")
             finally:
-                # 清理并允许下一次检查
+                
                 self._running = False
-
-        worker.finished.connect(_on_finished)
-        worker.finished.connect(worker.deleteLater)
-        worker.finished.connect(thread.quit)
-        thread.finished.connect(thread.deleteLater)
-        thread.start()
+      
+        self.worker.finished.connect(_on_finished)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.worker.finished.connect(self.thread.quit)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.start()
 
 

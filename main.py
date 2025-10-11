@@ -3,7 +3,7 @@ import sys
 import init
 from src.logging_config import logger
 
-VERSION = "v1.1.2"
+VERSION = "v1.2.0"
 
 
 
