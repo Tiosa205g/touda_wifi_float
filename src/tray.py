@@ -32,11 +32,9 @@ class Tray(QSystemTrayIcon):
         logger.info('托盘创建完毕')
     def onMenuShow(self):
         self.menu.setFocus()
-        logger.info("托盘菜单已打开")
     def toggle(self, reason):
         
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
-            logger.info('toggle')
             self.parent().setHidden(not self.parent().isHidden())
 
     def quit(self):

@@ -28,7 +28,7 @@ if __name__ == '__main__':
                 try:
                     init.main()
                 except Exception as e:
-                    logger.exception('发生错误：')
+                    logger.exception(f'发生错误：{e}')
     
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
