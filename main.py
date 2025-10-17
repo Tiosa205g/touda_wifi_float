@@ -3,14 +3,31 @@ import sys
 import os
 import init
 from src.logging_config import logger
-
+from src.config import CfgParse
 VERSION = "v1.2.0"
 CONFIG_DIR = os.path.join(os.getcwd(), "config")
 MAIN_CFG = os.path.join(CONFIG_DIR, "main.toml")
 LINKS_CFG = os.path.join(CONFIG_DIR, "links.toml")
 
 
+def init_config():
+    newFile = ['main', 'account_0', 'links']
+    logger.info("检查配置目录...")
+    if not os.path.exists('config'):
+        logger.info("正在初始化配置...")
+        os.mkdir('config')
 
+        list(map(lambda x: open('config/{}.toml'.format(x),'w'), newFile)) #创建文件
+
+        cfg = [x for x in map(lambda x:CfgParse('config/{}.toml'.format(x)),newFile)]
+        cfg[0].write('main','current_account','0')
+
+        # 写入默认链接
+        cfg[2].write('汕大','汕大官网','https://www.stu.edu.cn/')
+        cfg[2].write('汕大','教务系统','https://jw.stu.edu.cn/')
+        cfg[2].write('汕大','mystu','https://my.stu.edu.cn/')
+    else:
+        list(map(lambda x: '' if os.path.exists('config/{}.toml'.format(x)) else open('config/{}.toml'.format(x),'w'), newFile))
 if __name__ == '__main__':
     argv = sys.argv
     logger.info(f"argv: {argv}")
@@ -33,14 +50,18 @@ if __name__ == '__main__':
                 except Exception as e:
                     logger.exception(f'发生错误：{e}')
     
+    init_config()
+
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
     from src.touda import Worker
     from PySide6.QtCore import QThread
     from src import win_float_ball
     from src.tray import Tray
-    from src.config import CfgParse
     from qfluentwidgets import setTheme, Theme
+
+    
+
     app = QApplication()
     # 根据配置设置主题（自动/浅色/深色）
     try:
@@ -95,3 +116,4 @@ if __name__ == '__main__':
     win.show()
 
     app.exec()
+

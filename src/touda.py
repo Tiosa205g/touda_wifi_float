@@ -326,8 +326,11 @@ class wifi(QObject):
         self.password = password
         return self.login()
     def login(self)->bool:
+        if self.name == '' or self.password == '':
+            logger.warning('账号或密码为空')
+            return False
         logger.info(f"校园网注销:{self.logout()}")
-        r = self.session.post(self.url, headers=self.header, data=f"opr=pwdLogin&userName={self.name}&pwd={self.password}&ipv4or6=&rememberPwd=1", timeout=10)
+        r = self.session.post(self.url, headers=self.header, data=f"opr=pwdLogin&userName={self.name}&pwd={self.password}&ipv4or6=&rememberPwd=1")
         self.__state = self.getState()
         if r.status_code == 200:
             msg = r.content.decode()

@@ -31,13 +31,13 @@ class MyRoundMenu(RoundMenu):
 class handle:
     def __init__(self):
         self.main = config.CfgParse(path+"/config/main.toml")
-        self.current = config.CfgParse(path+f"/config/account_{self.main.get('main','current_account')}.toml")
-        webvpn_name = self.main.get('webvpn','name')
-        webvpn_password = base64.b64decode(self.main.get('webvpn','password').encode('utf-8')).decode('utf-8')
-        webvpn_key = self.main.get('webvpn','key')
-        webvpn_twfid = self.main.get('webvpn','twfid')
-        name = self.current.get('setting','name')
-        password = base64.b64decode(self.current.get('setting','password').encode('utf-8')).decode('utf-8')
+        self.current = config.CfgParse(path+f"/config/account_{self.main.get('main','current_account',0)}.toml")
+        webvpn_name = self.main.get('webvpn','name','')
+        webvpn_password = base64.b64decode(self.main.get('webvpn','password','').encode('utf-8')).decode('utf-8')
+        webvpn_key = self.main.get('webvpn','key','')
+        webvpn_twfid = self.main.get('webvpn','twfid','')
+        name = self.current.get('setting','name','')
+        password = base64.b64decode(self.current.get('setting','password','').encode('utf-8')).decode('utf-8')
 
         self.wifi = touda.wifi(name,password)
         self.webvpn = touda.webvpn(webvpn_name,webvpn_password,webvpn_key,webvpn_twfid)
