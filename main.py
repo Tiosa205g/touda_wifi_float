@@ -1,10 +1,13 @@
 
 import sys
+import os
 import init
 from src.logging_config import logger
 
 VERSION = "v1.2.0"
-
+CONFIG_DIR = os.path.join(os.getcwd(), "config")
+MAIN_CFG = os.path.join(CONFIG_DIR, "main.toml")
+LINKS_CFG = os.path.join(CONFIG_DIR, "links.toml")
 
 
 
@@ -36,8 +39,18 @@ if __name__ == '__main__':
     from PySide6.QtCore import QThread
     from src import win_float_ball
     from src.tray import Tray
+    from src.config import CfgParse
+    from qfluentwidgets import setTheme, Theme
     app = QApplication()
-
+    # 根据配置设置主题（自动/浅色/深色）
+    try:
+        cfg = CfgParse(MAIN_CFG)
+        theme_value = str(cfg.get('ui', 'theme', 'auto') or 'auto').lower()
+        t = Theme.AUTO if theme_value == 'auto' else (Theme.LIGHT if theme_value == 'light' else Theme.DARK)
+        setTheme(t)
+        logger.info(f'应用主题设置: {theme_value}')
+    except Exception:
+        pass
     win = win_float_ball.FloatBall(app.primaryScreen().size(),app)
     win.setWindowIcon(QIcon('res/ico/favicon.ico'))
     win.tray = Tray(win,VERSION)

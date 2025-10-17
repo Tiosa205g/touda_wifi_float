@@ -620,16 +620,8 @@ class SettingsWindow(FluentWindow):
         # 隐藏最小化和最大化按钮
         titleBar.minBtn.hide()
         titleBar.maxBtn.hide()
-        self.titleBar.setDoubleClickEnabled(False)
-        # 根据配置设置主题（自动/浅色/深色）
-        try:
-            ensure_cfg()
-            cfg = CfgParse(MAIN_CFG)
-            theme_value = str(cfg.get('ui', 'theme', 'auto') or 'auto').lower()
-            t = Theme.AUTO if theme_value == 'auto' else (Theme.LIGHT if theme_value == 'light' else Theme.DARK)
-            setTheme(t)
-        except Exception:
-            pass
+        self.titleBar.setDoubleClickEnabled(False) # 禁止双击最大化/还原
+        
         # 优先启用云母/亚克力效果（Win11/Win10支持）
         mica_enabled = False
         for api in ('setMicaEffectEnabled', 'setAcrylicEffectEnabled'):
@@ -667,7 +659,7 @@ class SettingsWindow(FluentWindow):
 
         self.move(self.geometry().center() - self.rect().center())# 居中
 
-        logger.info('设置窗口初始化完毕 mica=%s theme=%s', mica_enabled, theme_value)
+        logger.info('设置窗口初始化完毕 mica=%s', mica_enabled)
 
     def applyCustomStyleForTheme(self, theme: Theme):
         """根据主题切换浅/深自定义样式，避免深色下文字/背景不匹配"""
