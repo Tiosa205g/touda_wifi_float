@@ -8,6 +8,7 @@ from qfluentwidgets import SystemTrayMenu, Action
 from qfluentwidgets import FluentIcon as FIF
 from src import config
 from src.win_float_ball import MyRoundMenu
+from ui.windows.settings_window import SettingsWindow
 from src.logging_config import logger
 from ui.components import ProfileCard
 path = os.getcwd()
@@ -22,6 +23,7 @@ class Tray(QSystemTrayIcon):
         self.menu = SystemTrayMenu("touda_wifi", parent=parent)
         self.menu.addWidget(self.profile,selectable=False)
         self.menu.aboutToShow.connect(self.onMenuShow)
+        self.menu.addAction(Action(text='设置', triggered=self.open_settings))
         self.menu.addActions([Action(text='退出', triggered=self.quit)])
         self.activated.connect(self.toggle)
 
@@ -30,12 +32,37 @@ class Tray(QSystemTrayIcon):
 
         self.show()
         logger.info('托盘创建完毕')
+        self._settings_win = None
     def onMenuShow(self):
         self.menu.setFocus()
     def toggle(self, reason):
         
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.parent().setHidden(not self.parent().isHidden())
+    def open_settings(self):
+        # 安全地打开设置窗口：处理已删除的 Qt 对象引用
+        win = self._settings_win
+        if win is not None:
+            try:
+                if win.isVisible():
+                    win.raise_()
+                    win.activateWindow()
+                    return
+            except RuntimeError:
+                # C++ 对象已被删除，清空引用以便重新创建
+                self._settings_win = None
+
+        # 创建新的设置窗口，并在销毁时自动清理引用
+        try:
+            self._settings_win = SettingsWindow()
+            # 窗口关闭并删除后，自动将引用置空，避免悬空对象
+            try:
+                self._settings_win.destroyed.connect(lambda: setattr(self, '_settings_win', None))
+            except Exception:
+                pass
+            self._settings_win.show()
+        except Exception as e:
+            logger.exception(f"打开设置窗口失败: {e}")
 
     def quit(self):
         x,y=self.parent().geometry().x(),self.parent().geometry().y()

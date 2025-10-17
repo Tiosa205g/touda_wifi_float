@@ -237,7 +237,15 @@ class timer(QTimer):
     def __init__(self):
         super().__init__()
         self.timeout.connect(self.update)
-        self.start(60000)
+        # 从配置读取间隔（默认 60000ms）
+        try:
+            import os
+            from src import config
+            main = config.CfgParse(os.getcwd()+"/config/main.toml")
+            interval = int(main.get('main','timer_interval', 60000))
+        except Exception:
+            interval = 60000
+        self.start(max(10000, interval))
         # 是否有一次检查正在进行，避免并发
         self._running = False
 
