@@ -4,7 +4,7 @@ from typing import Dict, List
 
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QFileDialog, QMessageBox, QSpinBox
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QSpinBox
 
 from qfluentwidgets import (
     FluentWindow,
@@ -13,10 +13,10 @@ from qfluentwidgets import (
     LineEdit,
     PasswordLineEdit,
     ComboBox,
+    EditableComboBox,
     PushButton,
     StrongBodyLabel,
     InfoBar,
-    InfoBarIcon,
     FluentIcon as FIF,
     Dialog,
     setTheme,
@@ -92,6 +92,15 @@ class _BaseInterface(ScrollArea):
             self.viewport().setStyleSheet("background: transparent;")
         except Exception:
             pass
+        # 关键：避免中间层成为原生窗口，防止下拉框弹出时将其视为父级导致
+        # “QWidgetWindow(... ) must be a top level window” 的报错
+        try:
+            self.setAttribute(Qt.WA_NativeWindow, False)
+            self.setAttribute(Qt.WA_DontCreateNativeAncestors, True)
+            self.scrollWidget.setAttribute(Qt.WA_NativeWindow, False)
+            self.viewport().setAttribute(Qt.WA_NativeWindow, False)
+        except Exception:
+            pass
 
     def addGroup(self, title: str):
         """创建一个简单分组容器，返回其 QVBoxLayout，可直接 addWidget(row)"""
@@ -120,15 +129,13 @@ class GeneralInterface(_BaseInterface):
         # 常规：WiFi 状态检查间隔（秒）
         g_account = self.addGroup("常规")
 
-        rowInterval = QWidget(self)
+        rowInterval = QWidget(self.scrollWidget)
         h1 = QHBoxLayout(rowInterval)
         h1.setContentsMargins(12, 8, 12, 8)
         h1.setSpacing(12)
         self.spinInterval = QSpinBox(rowInterval)
         self.spinInterval.setRange(10, 3600)  # 秒
         self.spinInterval.setSingleStep(10)
-        # 颜色交由主题样式控制
-        
         # 读取配置（毫秒），转换为秒
         interval_ms = self.mainCfg.get('main', 'timer_interval', 60000)
         try:
@@ -138,9 +145,7 @@ class GeneralInterface(_BaseInterface):
         self.spinInterval.setValue(interval_s)
         self.btnSaveInterval = PushButton("保存")
         self.btnOpenDir = PushButton("打开配置文件夹")
-    # self.btnOpenDir.setIcon(FIF.FOLDER.icon())  # 移除图标，仅保留文字
         self.btnOpenDir.clicked.connect(lambda: os.startfile(CONFIG_DIR))
-    # self.btnSaveInterval.setIcon(FIF.SAVE.icon())  # 移除图标，仅保留文字
         self.btnSaveInterval.clicked.connect(self.saveInterval)
         h1.addWidget(StrongBodyLabel("WiFi 状态检查间隔(秒):"))
         h1.addWidget(self.spinInterval)
@@ -150,12 +155,17 @@ class GeneralInterface(_BaseInterface):
         g_account.addWidget(rowInterval)
 
         # 主题选择（自动/浅色/深色）
-        rowTheme = QWidget(self)
+        rowTheme = QWidget(self.scrollWidget)
         h2 = QHBoxLayout(rowTheme)
         h2.setContentsMargins(12, 8, 12, 8)
         h2.setSpacing(12)
         self.cmbTheme = ComboBox(rowTheme)
         self.cmbTheme.addItems(["自动", "浅色", "深色"])
+        # 避免 ComboBox 弹出层找错父级
+        try:
+            self.cmbTheme.setAttribute(Qt.WA_DontCreateNativeAncestors, True)
+        except Exception:
+            pass
         # 从配置读取默认主题
         theme_value = str(self.mainCfg.get('ui', 'theme', 'auto') or 'auto').lower()
         idx_map = { 'auto': 0, 'light': 1, 'dark': 2 }
@@ -173,15 +183,7 @@ class GeneralInterface(_BaseInterface):
         seconds = int(self.spinInterval.value())
         ms = max(10000, seconds * 1000)
         self.mainCfg.write('main', 'timer_interval', ms)
-        # 若父窗口是 FloatBall，让定时器即时生效
-        try:
-            win = self.window().parent()  # SettingsWindow 的 parent 是 FloatBall
-            if hasattr(win, 'timer') and win.timer is not None:
-                win.timer.setInterval(ms)
-                win.timer.start(ms)
-        except Exception:
-            pass
-        InfoBar.success(title='已保存', content=f'已设置间隔为 {seconds} 秒', duration=1500, parent=self)
+        InfoBar.success(title='已保存', content=f'已设置间隔为 {seconds} 秒，重启软件后生效', duration=1500, parent=self)
 
     def applyTheme(self, *_):
         idx = self.cmbTheme.currentIndex()
@@ -194,7 +196,7 @@ class GeneralInterface(_BaseInterface):
             setTheme(t)
         except Exception:
             pass
-        # 通知父窗口更新样式（浅/深不同配色）
+        # 通知父窗口更新样式（浅/深不同配色） 
         try:
             sw = self.window()
             if hasattr(sw, 'applyCustomStyleForTheme'):
@@ -216,7 +218,7 @@ class WebVpnInterface(_BaseInterface):
         g_webvpn = self.addGroup("WebVPN")
 
         # name
-        row_name = QWidget(self)
+        row_name = QWidget(self.scrollWidget)
         l = QHBoxLayout(row_name)
         l.setContentsMargins(12, 8, 12, 8)
         self.editName = LineEdit(row_name)
@@ -227,7 +229,7 @@ class WebVpnInterface(_BaseInterface):
         g_webvpn.addWidget(row_name)
 
         # password
-        row_pwd = QWidget(self)
+        row_pwd = QWidget(self.scrollWidget)
         l2 = QHBoxLayout(row_pwd)
         l2.setContentsMargins(12, 8, 12, 8)
         self.editPwd = PasswordLineEdit(row_pwd)
@@ -237,26 +239,26 @@ class WebVpnInterface(_BaseInterface):
         g_webvpn.addWidget(row_pwd)
 
         # key
-        row_key = QWidget(self)
+        row_key = QWidget(self.scrollWidget)
         l3 = QHBoxLayout(row_key)
         l3.setContentsMargins(12, 8, 12, 8)
         self.editKey = LineEdit(row_key)
-        self.editKey.setPlaceholderText("动态口令密钥 (TOTP)")
+        self.editKey.setPlaceholderText("请输入生成动态口令(TOTP)密钥")
         self.editKey.setClearButtonEnabled(True)
         l3.addWidget(StrongBodyLabel("密钥:"))
         l3.addWidget(self.editKey)
         g_webvpn.addWidget(row_key)
 
         # buttons
-        row_btn = QWidget(self)
+        row_btn = QWidget(self.scrollWidget)
         l4 = QHBoxLayout(row_btn)
         l4.setContentsMargins(12, 8, 12, 8)
         self.btnSave = PushButton("保存")
         self.btnCopyTwfid = PushButton("复制 TWFID")
         self.btnClearTwfid = PushButton("清空 TWFID")
-    # self.btnSave.setIcon(FIF.SAVE.icon())  # 移除图标，仅保留文字
-    # self.btnCopyTwfid.setIcon(FIF.COPY.icon())  # 移除图标，仅保留文字
-    # self.btnClearTwfid.setIcon(FIF.DELETE.icon())  # 移除图标，仅保留文字
+        # self.btnSave.setIcon(FIF.SAVE.icon())  # 移除图标，仅保留文字
+        # self.btnCopyTwfid.setIcon(FIF.COPY.icon())  # 移除图标，仅保留文字
+        # self.btnClearTwfid.setIcon(FIF.DELETE.icon())  # 移除图标，仅保留文字
         self.btnSave.clicked.connect(self.save)
         self.btnCopyTwfid.clicked.connect(self.copyTwfid)
         self.btnClearTwfid.clicked.connect(self.clearTwfid)
@@ -301,7 +303,7 @@ class WebVpnInterface(_BaseInterface):
     def clearTwfid(self):
         # 清空登录态
         self.mainCfg.write('webvpn', 'twfid', '')
-        InfoBar.success(title='已清空', content='已清空 TWFID', duration=1200, parent=self)
+        InfoBar.success(title='已清空', content='已清空 TWFID,下次登录时将不再使用', duration=1200, parent=self)
 
 
 class AccountsInterface(_BaseInterface):
@@ -311,14 +313,18 @@ class AccountsInterface(_BaseInterface):
         ensure_cfg()
         self.mainCfg = CfgParse(MAIN_CFG)
 
-        g = self.addGroup("账户管理")
+        g = self.addGroup("WiFi账户管理")
 
         # selector row
-        row = QWidget(self)
+        row = QWidget(self.scrollWidget)
         hl = QHBoxLayout(row)
         hl.setContentsMargins(12, 8, 12, 8)
         self.combo = ComboBox(row)
         self.combo.setMinimumWidth(260)
+        try:
+            self.combo.setAttribute(Qt.WA_DontCreateNativeAncestors, True)
+        except Exception:
+            pass
         self.btnRefresh = PushButton("刷新")
         self.btnAdd = PushButton("添加")
         self.btnEdit = PushButton("修改")
@@ -326,9 +332,10 @@ class AccountsInterface(_BaseInterface):
         self.btnMakeCurrent = PushButton("设为当前")
         # for b in (self.btnRefresh, self.btnAdd, self.btnEdit, self.btnDel, self.btnMakeCurrent):
         #     b.setIcon(FIF.ADD_TO.icon() if b is self.btnAdd else b.icon())  # 移除所有图标，仅保留文字
+        self.combo.currentIndexChanged.connect(self.load_current_to_editor)
         self.btnRefresh.clicked.connect(self.reload)
         self.btnAdd.clicked.connect(self.addAccount)
-        self.btnEdit.clicked.connect(self.editAccount)
+        self.btnEdit.clicked.connect(self.saveEdit)
         self.btnDel.clicked.connect(self.deleteAccount)
         self.btnMakeCurrent.clicked.connect(self.makeCurrent)
         hl.addWidget(StrongBodyLabel("选择账号:"))
@@ -341,21 +348,21 @@ class AccountsInterface(_BaseInterface):
         g.addWidget(row)
 
         # editor row
-        row2 = QWidget(self)
+        row2 = QWidget(self.scrollWidget)
         hl2 = QHBoxLayout(row2)
         hl2.setContentsMargins(12, 8, 12, 8)
         self.editName = LineEdit(row2)
         self.editName.setPlaceholderText("WiFi 账号")
         self.editPwd = PasswordLineEdit(row2)
         self.editPwd.setPlaceholderText("WiFi 密码")
-        self.btnSave = PushButton("保存修改")
+        #self.btnSave = PushButton("保存修改")
         #self.btnSave.setIcon(FIF.SAVE.icon())
-        self.btnSave.clicked.connect(self.save)
+        #self.btnSave.clicked.connect(self.save)
         hl2.addWidget(StrongBodyLabel("名称:"))
         hl2.addWidget(self.editName)
         hl2.addWidget(StrongBodyLabel("密码:"))
         hl2.addWidget(self.editPwd)
-        hl2.addWidget(self.btnSave)
+        #hl2.addWidget(self.btnSave)
         g.addWidget(row2)
 
         self.reload()
@@ -401,18 +408,15 @@ class AccountsInterface(_BaseInterface):
             idx += 1
         new_path = os.path.join(CONFIG_DIR, f"account_{idx}.toml")
         open(new_path, 'w', encoding='utf-8').close()
+        name = self.editName.text().strip() or "new_user"
+        pwd = self.editPwd.text()
         cfg = CfgParse(new_path)
-        cfg.write('setting', 'name', 'new_user')
-        cfg.write('setting', 'password', write_b64('password'))
+        cfg.write('setting', 'name', name)
+        cfg.write('setting', 'password', write_b64(pwd))
         InfoBar.success(title='已添加', content=f'创建 account_{idx}.toml', duration=1500, parent=self)
         self.reload()
 
-    def editAccount(self):
-        if self.combo.count() == 0:
-            return
-        self.load_current_to_editor()
-
-    def save(self):
+    def saveEdit(self):
         if self.combo.count() == 0:
             InfoBar.error(title='无账号', content='请先添加账号', duration=1500, parent=self)
             return
@@ -458,49 +462,100 @@ class LinksInterface(_BaseInterface):
 
         g = self.addGroup("链接管理")
 
-        # 操作区：类别、名称、链接 + 按钮
-        row = QWidget(self)
-        hl = QHBoxLayout(row)
-        hl.setContentsMargins(12, 8, 12, 8)
-        self.cmbType = ComboBox(row)
-        self.cmbType.setMinimumWidth(140)
-        self.editName = LineEdit(row)
-        self.editName.setPlaceholderText("名称")
-        self.editLink = LineEdit(row)
-        self.editLink.setPlaceholderText("https://...")
+        row1 = QWidget(self.scrollWidget)
+        h1 = QHBoxLayout(row1)
+        h1.setContentsMargins(12, 8, 12, 8)
+        h1.setSpacing(12)
         self.btnAddOrUpdate = PushButton("新增/更新")
         self.btnDelete = PushButton("删除")
         self.btnExport = PushButton("导出当前类别")
-        self.btnImport = PushButton("导入到类别…")
+        self.btnImport = PushButton("导入到当前类别")
         self.btnAddOrUpdate.clicked.connect(self.add_or_update)
         self.btnDelete.clicked.connect(self.delete)
         self.btnExport.clicked.connect(self.export_type)
         self.btnImport.clicked.connect(self.import_to_type)
-        hl.addWidget(StrongBodyLabel("类别:"))
-        hl.addWidget(self.cmbType)
-        hl.addWidget(StrongBodyLabel("名称:"))
-        hl.addWidget(self.editName)
-        hl.addWidget(StrongBodyLabel("链接:"))
-        hl.addWidget(self.editLink, 1)
-        hl.addWidget(self.btnAddOrUpdate)
-        hl.addWidget(self.btnDelete)
-        hl.addWidget(self.btnExport)
-        hl.addWidget(self.btnImport)
-        g.addWidget(row)
+        h1.addWidget(self.btnAddOrUpdate)
+        h1.addWidget(self.btnDelete)
+        h1.addWidget(self.btnExport)
+        h1.addWidget(self.btnImport)
+        h1.addStretch(1)
+        g.addWidget(row1)
 
-        # 二行：快速选择已有条目
-        row2 = QWidget(self)
-        hl2 = QHBoxLayout(row2)
-        hl2.setContentsMargins(12, 8, 12, 8)
-        self.cmbExistName = ComboBox(row2)
-        self.cmbExistName.setMinimumWidth(220)
-        self.cmbExistName.currentIndexChanged.connect(self.on_exist_selected)
-        hl2.addWidget(StrongBodyLabel("已存在:"))
-        hl2.addWidget(self.cmbExistName, 1)
+        # 操作区：类别、名称、链接 + 按钮
+        row2 = QWidget(self.scrollWidget)
+        h2 = QHBoxLayout(row2)
+        h2.setContentsMargins(12, 8, 12, 8)
+        h2.setSpacing(12)
+        self.cmbType = EditableComboBox(row2)
+        self.cmbType.setMinimumWidth(180)
+        try:
+            self.cmbType.setAttribute(Qt.WA_DontCreateNativeAncestors, True)
+        except Exception:
+            pass
+        # 设置占位符文本提示用户可输入
+        try:
+            self.cmbType.setPlaceholderText("输入或选择类别")
+        except Exception:
+            pass
+        # 启用清除按钮
+        try:
+            self.cmbType.setClearButtonEnabled(True)
+        except Exception:
+            pass
+        try:
+            self.cmbType.currentIndexChanged.connect(self.reload_names)
+            self.cmbType.editTextChanged.connect(self.reload_names)
+        except Exception:
+            pass
+        h2.addWidget(StrongBodyLabel("类别:"))
+        h2.addWidget(self.cmbType, 1)
         g.addWidget(row2)
 
+        # 名称行
+        self.cmbName = EditableComboBox(self.scrollWidget)
+        self.cmbName.setMinimumWidth(280)
+        try:
+            self.cmbName.setAttribute(Qt.WA_DontCreateNativeAncestors, True)
+        except Exception:
+            pass
+        try:
+            self.cmbName.setPlaceholderText("输入或选择名称")
+            self.cmbName.setClearButtonEnabled(True)
+        except Exception:
+            pass
+        rowName = QWidget(self.scrollWidget)
+        hlName = QHBoxLayout(rowName)
+        hlName.setContentsMargins(12, 4, 12, 4)
+        hlName.setSpacing(12)
+        hlName.addWidget(StrongBodyLabel("名称:"))
+        hlName.addWidget(self.cmbName, 1)
+        g.addWidget(rowName)
+
+        # 链接行（更长、更易点）
+        self.editLink = LineEdit(self.scrollWidget)
+        self.editLink.setPlaceholderText("输入完整链接，如：https://example.com")
+        try:
+            self.editLink.setClearButtonEnabled(True)
+        except Exception:
+            pass
+        self.editLink.setMinimumWidth(700)
+        rowLink = QWidget(self.scrollWidget)
+        hlLink = QHBoxLayout(rowLink)
+        hlLink.setContentsMargins(12, 4, 12, 4)
+        hlLink.setSpacing(12)
+        hlLink.addWidget(StrongBodyLabel("链接:"))
+        hlLink.addWidget(self.editLink, 1)
+        g.addWidget(rowLink)
+
         self.reload_types()
+        try:
+            self.cmbName.currentIndexChanged.connect(self.on_name_selected)
+            self.cmbName.editTextChanged.connect(self.on_name_selected)
+        except Exception:
+            pass
         self.addFooterSpacer()
+
+        self.on_name_selected()
 
     def _load_all(self) -> Dict:
         try:
@@ -516,31 +571,29 @@ class LinksInterface(_BaseInterface):
         # 如果没有类别，先放一个默认
         if self.cmbType.count() == 0:
             self.cmbType.addItem("常用")
-        self.reload_exist_names()
+        self.reload_names()
 
-    def reload_exist_names(self):
-        self.cmbExistName.clear()
+    def reload_names(self):
+        self.cmbName.clear()
         data = self._load_all()
         t = self.cmbType.currentText()
         names = []
         if t in data and isinstance(data[t], dict):
             names = list(data[t].keys())
         for n in names:
-            self.cmbExistName.addItem(n)
-        if names:
-            self.on_exist_selected(0)
+            self.cmbName.addItem(n)
 
-    def on_exist_selected(self, _):
+    def on_name_selected(self):
         data = self._load_all()
         t = self.cmbType.currentText()
-        n = self.cmbExistName.currentText()
+        n = self.cmbName.currentText()
         if t in data and isinstance(data[t], dict) and n in data[t]:
-            self.editName.setText(n)
+            self.cmbName.setCurrentText(n)
             self.editLink.setText(str(data[t][n]))
 
     def add_or_update(self):
         t = self.cmbType.currentText().strip() or "常用"
-        n = self.editName.text().strip()
+        n = self.cmbName.currentText().strip()
         link = self.editLink.text().strip()
         if not n or not link:
             InfoBar.warning(title='缺少信息', content='请填写 名称 与 链接', duration=1500, parent=self)
@@ -554,7 +607,7 @@ class LinksInterface(_BaseInterface):
 
     def delete(self):
         t = self.cmbType.currentText().strip()
-        n = self.editName.text().strip() or self.cmbExistName.currentText()
+        n = self.cmbName.currentText().strip()
         data = self._load_all()
         if not t or t not in data or n not in data[t]:
             return
@@ -649,9 +702,18 @@ class SettingsWindow(FluentWindow):
         self.linksInterface = LinksInterface(self)
         self.linksInterface.setObjectName('linksInterface')
 
+        # 避免子页面成为原生子窗口，破坏弹出层父级判断
+        for w in (self.generalInterface, self.webvpnInterface, self.accountsInterface, self.linksInterface):
+            try:
+                w.setAttribute(Qt.WA_NativeWindow, False)
+                w.setAttribute(Qt.WA_DontCreateNativeAncestors, True)
+                w.viewport().setAttribute(Qt.WA_NativeWindow, False)
+            except Exception:
+                pass
+
         self.addSubInterface(self.generalInterface, FIF.SETTING, '常规', NavigationItemPosition.TOP)
         self.addSubInterface(self.webvpnInterface, FIF.VPN, 'WebVPN', NavigationItemPosition.TOP)
-        self.addSubInterface(self.accountsInterface, FIF.PEOPLE, '账户', NavigationItemPosition.TOP)
+        self.addSubInterface(self.accountsInterface, FIF.PEOPLE, 'WiFi账户', NavigationItemPosition.TOP)
         self.addSubInterface(self.linksInterface, FIF.LINK, '链接', NavigationItemPosition.TOP)
 
         self.navigationInterface.setExpandWidth(240)
