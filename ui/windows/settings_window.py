@@ -437,7 +437,8 @@ class AccountsInterface(_BaseInterface):
             InfoBar.warning(title='不允许删除', content='0 号账户不能删除，只能修改', duration=2000, parent=self)
             return
         base = os.path.basename(self.accounts[idx])
-        if Dialog("确认删除", f"确定删除 {base} ?", self).exec():
+        dialog = Dialog("确认删除", f"确定删除 {base} ?")
+        if dialog.exec():
             try:
                 os.remove(self.accounts[idx])
                 InfoBar.success(title='已删除', content=base, duration=1200, parent=self)

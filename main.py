@@ -63,6 +63,7 @@ if __name__ == '__main__':
     
 
     app = QApplication()
+    app.setQuitOnLastWindowClosed(False)
     # 根据配置设置主题（自动/浅色/深色）
     try:
         cfg = CfgParse(MAIN_CFG)
