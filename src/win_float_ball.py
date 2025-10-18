@@ -51,6 +51,7 @@ class FloatBall(DragWindow):
         self.ui = UI_FloatBall()
         self.ui.setupUI(self)
         self.setFixedSize(self.ui.waterBall.size())
+        self.setResizeEnabled(False)
 
         self.setCanLeftScreen(False, screen_size=screen_size)
         self.ui.waterBall.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -79,16 +80,19 @@ class FloatBall(DragWindow):
         linkMenu = MyRoundMenu("链接")
         webvpnMenu = MyRoundMenu("webvpn相关")
         acc = []
-        curr = config.CfgParse(path+"/config/main.toml").get('main','current_account')
+        #curr = config.CfgParse(path+"/config/main.toml").get('main','current_account')
         i = 0
         for file in os.listdir('config'):
             if 'account_' in file and '.toml' in file:
                 acc.append("config/"+file)
                 now = config.CfgParse("config/"+file)
                 name = now.get('setting','name')
-                password = base64.b64decode(now.get('setting','password').encode('utf-8')).decode('utf-8')
-                accountMenu.addAction(Action(text="切换为"+name, icon=FIF.CHAT, triggered=partial(self.change_account,name,password,i)))
-                i+=1
+                password = base64.b64decode(now.get('setting','password','').encode('utf-8')).decode('utf-8')
+                if name and password:
+                    accountMenu.addAction(Action(text="切换为"+name, icon=FIF.CHAT, triggered=partial(self.change_account,name,password,i)))
+                    i+=1
+
+        logger.info(f"已加载{i}个账号")
 
         linkMenu.addAction(Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link))
         # 移入webvpn相关

@@ -660,6 +660,7 @@ class SettingsWindow(FluentWindow):
         super().__init__(parent)
         self.setWindowTitle('设置 - Touda WiFi')
         self.setFixedSize(1000, 600)  # 固定宽度 1000，高度 600
+        self.setResizeEnabled(False)
         self.setAttribute(Qt.WA_QuitOnClose, False)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
         # 独立窗口
