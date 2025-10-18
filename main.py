@@ -1,7 +1,7 @@
 
 import sys
 import os
-import init
+# import init
 from src.logging_config import logger
 from src.config import CfgParse
 VERSION = "v1.2.0"
@@ -31,24 +31,24 @@ def init_config():
 if __name__ == '__main__':
     argv = sys.argv
     logger.info(f"argv: {argv}")
-    if len(argv) == 2:
-        if argv[1] == "setting":
-            # 如果是打包的exe且需要控制台，动态创建控制台
-            if getattr(sys, 'frozen', False):  # 检查是否为打包的exe
-                import ctypes
-                ctypes.windll.kernel32.AllocConsole()
-                # 重定向标准输入输出到控制台
-                try:
-                    sys.stdout = open('CONOUT$', 'w')
-                    sys.stderr = open('CONOUT$', 'w')
-                    sys.stdin = open('CONIN$', 'r')
-                except Exception as e:
-                    sys.exit("重定向失败退出")
-            while True:
-                try:
-                    init.main()
-                except Exception as e:
-                    logger.exception(f'发生错误：{e}')
+    # if len(argv) == 2:
+    #     if argv[1] == "setting":
+    #         # 如果是打包的exe且需要控制台，动态创建控制台
+    #         if getattr(sys, 'frozen', False):  # 检查是否为打包的exe
+    #             import ctypes
+    #             ctypes.windll.kernel32.AllocConsole()
+    #             # 重定向标准输入输出到控制台
+    #             try:
+    #                 sys.stdout = open('CONOUT$', 'w')
+    #                 sys.stderr = open('CONOUT$', 'w')
+    #                 sys.stdin = open('CONIN$', 'r')
+    #             except Exception as e:
+    #                 sys.exit("重定向失败退出")
+    #         while True:
+    #             try:
+    #                 init.main()
+    #             except Exception as e:
+    #                 logger.exception(f'发生错误：{e}')
     
     init_config()
 
