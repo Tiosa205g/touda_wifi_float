@@ -4,13 +4,14 @@ from typing import Dict, List
 
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QSpinBox
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout
 
 from qfluentwidgets import (
     FluentWindow,
     NavigationItemPosition,
     ScrollArea,
     LineEdit,
+    SpinBox,
     PasswordLineEdit,
     ComboBox,
     EditableComboBox,
@@ -133,7 +134,7 @@ class GeneralInterface(_BaseInterface):
         h1 = QHBoxLayout(rowInterval)
         h1.setContentsMargins(12, 8, 12, 8)
         h1.setSpacing(12)
-        self.spinInterval = QSpinBox(rowInterval)
+        self.spinInterval = SpinBox(rowInterval)
         self.spinInterval.setRange(10, 3600)  # 秒
         self.spinInterval.setSingleStep(10)
         # 读取配置（毫秒），转换为秒
@@ -243,7 +244,7 @@ class WebVpnInterface(_BaseInterface):
         l3 = QHBoxLayout(row_key)
         l3.setContentsMargins(12, 8, 12, 8)
         self.editKey = LineEdit(row_key)
-        self.editKey.setPlaceholderText("请输入生成动态口令(TOTP)密钥")
+        self.editKey.setPlaceholderText("生成动态口令(TOTP)密钥")
         self.editKey.setClearButtonEnabled(True)
         l3.addWidget(StrongBodyLabel("密钥:"))
         l3.addWidget(self.editKey)
