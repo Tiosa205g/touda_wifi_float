@@ -232,12 +232,15 @@ def get_data(put) -> tuple[float,float]:
     data = re.findall("<tr> <td>([^<]*)</td> <td>([^<]*)", put)
     limit = 0.0
     now = 0.0
+    name = '<UNK>'
     for a, b in data:
-        if a.find("流量额") != -1:
+        if a.find("用户名") != -1:
+            name = b
+        elif a.find("流量额") != -1:
             limit = float(GtoM(b))
         elif a.find("当天") != -1:
             now = float(GtoM(b))
-    return limit, now
+    return limit, now, name
 def get_vpn_url(site)->str:
     """
     格式：xxx://xxxx(:xxx)(/xxx)
@@ -356,7 +359,8 @@ class wifi(QObject):
         state = self.state()
 
 
-        r = self.session.post("https://a.stu.edu.cn/ac_portal/userflux",headers=self.header)
+        r = self.session.post("https://a.stu.edu.cn/ac_portal/userflux",
+                              headers=self.header)
         if r.status_code == 200:
             try:
                 ret = r.content.decode()
@@ -378,9 +382,9 @@ class wifi(QObject):
                 state.used = 0
                 state.name = self.name
             else:
+                state.total,state.used,self.name = get_data(ret)
                 state.state = "已登录"
                 state.name = self.name
-                state.total,state.used = get_data(ret)
         else:
             state.state = "未登录"
             state.total = 0
