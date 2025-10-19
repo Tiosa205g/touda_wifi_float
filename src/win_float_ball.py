@@ -1,5 +1,4 @@
 import os
-import threading
 import webbrowser
 import base64
 from functools import partial
