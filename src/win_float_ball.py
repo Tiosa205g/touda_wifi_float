@@ -122,7 +122,7 @@ class FloatBall(DragWindow):
         site = cb.text()
         
         # ([a-zA-z]+://)([^/]*)(/.*)
-        it = re.finditer('(https?://)(.*)(/.*)', site,re.I)
+        it = re.finditer('(https?://)([^/]*)(/.*)', site,re.I)
 
         for match in it:
             all = match.group()
@@ -172,7 +172,7 @@ class FloatBall(DragWindow):
         self.bridge.webvpn.autoLogin()
         twfid = self.bridge.webvpn.twfid
         self.app.clipboard().setText(twfid)
-    def open_link_window(self,name,link,*args):
+    def open_link_window(self,name:str,link:str,*args):
         if "live" in link and "bilibili" in link:
             a = Dialog("匹配到bilibili直播链接",f"是否使用使用解析打开{name}",self)
             a.yesButton.setText("是")
@@ -199,7 +199,7 @@ class FloatBall(DragWindow):
                         webbrowser.open(url)
 
                 return
-        w = Dialog("选择:",f"是否使用webvpn打开{name}",self)
+        w = Dialog("选择:",f"是否使用webvpn打开{name[:70] + ('...' if len(name) > 70 else '')}",self)
         w.yesButton.setText("是")
         w.cancelButton.setText("否")
         if w.exec():
