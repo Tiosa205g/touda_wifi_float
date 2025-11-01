@@ -3,6 +3,18 @@ import sys
 import os
 from datetime import datetime
 
+def get_main_program_directory():
+    """获取主程序入口文件所在的目录"""
+    if getattr(sys, 'frozen', False):
+        # 打包后的环境
+        main_path = sys.executable
+    else:
+        # Python环境
+        main_path = sys.argv[0]
+        if not os.path.isabs(main_path):
+            main_path = os.path.abspath(main_path)
+    
+    return os.path.dirname(main_path)
 
 # Configure logging on import
 def setup_logging(log_level=logging.INFO):
@@ -12,23 +24,7 @@ def setup_logging(log_level=logging.INFO):
 
     root.setLevel(log_level)
 
-    # Ensure project root
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-# 运行在打包后的 exe 时，__file__ 指向临时解压路径，写入那里会被清理
-    # 因此当 frozen 时优先写入 exe 所在目录；若不可写则回退到临时目录
-    import tempfile
-    if getattr(sys, 'frozen', False):
-        exe_dir = os.path.dirname(sys.executable) or project_root
-        log_dir = exe_dir if os.access(exe_dir, os.W_OK) else tempfile.gettempdir()
-    else:
-        log_dir = project_root
-    # 尝试确保目录存在（一般 exe_dir / project_root 已存在）
-    try:
-        os.makedirs(log_dir, exist_ok=True)
-    except Exception:
-        log_dir = tempfile.gettempdir()
-    # Only maintain/overwrite last.log in project root
-    last_fname = os.path.join(log_dir, 'last.log')
+    last_fname = os.path.join(get_main_program_directory(), 'last.log')
 
     # Formatter: [YYYY-MM-DD HH:MM:SS][LEVEL] message
     fmt = logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')

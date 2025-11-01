@@ -76,6 +76,7 @@ if __name__ == '__main__':
     win = win_float_ball.FloatBall(app.primaryScreen().size(),app)
     win.setWindowIcon(QIcon('res/ico/favicon.ico'))
     win.tray = Tray(win,VERSION)
+    
     win.bridge.wifi.state_update.connect(win.tray.profile.onUpdateState)
     win.bridge.wifi.state_update.connect(lambda state : logger.info(f"校园网状态更新：{state}"))
     win.bridge.wifi.flux_update.connect(lambda total,used : win.ui.waterBall.set_progress((((total-used)*100/total) if total != 0 else 100)))
