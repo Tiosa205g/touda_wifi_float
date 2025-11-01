@@ -4,7 +4,7 @@ import os
 # import init
 from src.logging_config import logger
 from src.config import CfgParse
-VERSION = "v1.3.1"
+VERSION = "v1.3.2"
 CONFIG_DIR = os.path.join(os.getcwd(), "config")
 MAIN_CFG = os.path.join(CONFIG_DIR, "main.toml")
 LINKS_CFG = os.path.join(CONFIG_DIR, "links.toml")
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     win = win_float_ball.FloatBall(app.primaryScreen().size(),app)
     win.setWindowIcon(QIcon('res/ico/favicon.ico'))
     win.tray = Tray(win,VERSION)
-    
+
     win.bridge.wifi.state_update.connect(win.tray.profile.onUpdateState)
     win.bridge.wifi.state_update.connect(lambda state : logger.info(f"校园网状态更新：{state}"))
     win.bridge.wifi.flux_update.connect(lambda total,used : win.ui.waterBall.set_progress((((total-used)*100/total) if total != 0 else 100)))
