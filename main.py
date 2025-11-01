@@ -4,7 +4,7 @@ import os
 # import init
 from src.logging_config import logger
 from src.config import CfgParse
-VERSION = "v1.3.0"
+VERSION = "v1.3.1"
 CONFIG_DIR = os.path.join(os.getcwd(), "config")
 MAIN_CFG = os.path.join(CONFIG_DIR, "main.toml")
 LINKS_CFG = os.path.join(CONFIG_DIR, "links.toml")
@@ -77,6 +77,7 @@ if __name__ == '__main__':
     win.setWindowIcon(QIcon('res/ico/favicon.ico'))
     win.tray = Tray(win,VERSION)
     win.bridge.wifi.state_update.connect(win.tray.profile.onUpdateState)
+    win.bridge.wifi.state_update.connect(lambda state : logger.info(f"校园网状态更新：{state}"))
     win.bridge.wifi.flux_update.connect(lambda total,used : win.ui.waterBall.set_progress((((total-used)*100/total) if total != 0 else 100)))
 
     # 为每个耗时任务创建独立的 QThread，避免把多个任务放到同一个线程导致串行和难以管理
@@ -99,20 +100,6 @@ if __name__ == '__main__':
 
     wifi_thread, wifi_worker = start_worker_in_thread(win.bridge.wifi.login, "校园网登录")
     webvpn_thread, webvpn_worker = start_worker_in_thread(win.bridge.webvpn.autoLogin, "webvpn登录")
-
-    from PySide6.QtCore import QCoreApplication
-
-    def stop_threads_and_wait():
-        for t in (wifi_thread, webvpn_thread):
-            try:
-                if t is not None and t.isRunning():
-                    t.quit()
-                    # 等待最多 2 秒，可根据需要调整
-                    t.wait(2000)
-            except Exception:
-                pass
-
-    QCoreApplication.instance().aboutToQuit.connect(stop_threads_and_wait)
 
     win.show()
 

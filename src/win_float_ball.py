@@ -2,7 +2,7 @@ import os
 import webbrowser
 import base64
 from functools import partial
-from PySide6.QtCore import QTimer, QPoint, QThread
+from PySide6.QtCore import  QPoint,QTimer
 from PySide6.QtGui import Qt
 from PySide6.QtWidgets import QApplication, QInputDialog
 from qfluentwidgets import TeachingTip, RoundMenu, Action, Dialog
@@ -10,7 +10,6 @@ from qfluentwidgets import FluentIcon as FIF
 from ui.float_ball import UI_FloatBall
 from ui.windows.drag_window import DragWindow
 from src import touda, config
-from src.touda import Worker
 from src.logging_config import logger
 path = os.getcwd()
 class MyRoundMenu(RoundMenu):
@@ -41,8 +40,6 @@ class handle:
         self.wifi = touda.wifi(name,password)
         self.webvpn = touda.webvpn(webvpn_name,webvpn_password,webvpn_key,webvpn_twfid)
         self.webvpn.twfid_update.connect(lambda twfid:self.main.write('webvpn','twfid',twfid))
-
-awa = handle()
 class FloatBall(DragWindow):
     def __init__(self,screen_size,app:QApplication):
         super().__init__()
@@ -59,10 +56,8 @@ class FloatBall(DragWindow):
 
         #self.ui.waterBall.rightClicked.connect(self.waterBall_right_clicked)
         
-        self.timer = timer()
-        self.timer.win = self
-        self.bridge = awa
-        
+        self.bridge = handle()
+        self.update_timer = Update_timer(self.bridge)
         x,y=self.bridge.main.get('main','x',0),self.bridge.main.get('main','y',0) #设置初始位置为上一次关闭位置
         self.move(x,y)
     def waterBall_double_click(self):
@@ -178,8 +173,8 @@ class FloatBall(DragWindow):
             a.yesButton.setText("是")
             a.cancelButton.setText("否")
             if a.exec():
-                awa.webvpn.autoLogin()
-                bilibili = touda.live_bilibili(awa.webvpn.twfid)
+                self.bridge.webvpn.autoLogin()
+                bilibili = touda.live_bilibili(self.bridge.webvpn.twfid)
                 url = bilibili.get_live_url(link)
                 if len(url) > 0:
                     short_url = []
@@ -203,7 +198,7 @@ class FloatBall(DragWindow):
         w.yesButton.setText("是")
         w.cancelButton.setText("否")
         if w.exec():
-            url = awa.webvpn.create_url(link)
+            url = self.bridge.webvpn.create_url(link)
             webbrowser.open(url)
         else:
             webbrowser.open(link)
@@ -231,69 +226,20 @@ class FloatBall(DragWindow):
             logger.info("切换账号成功")
         except Exception as e:
             logger.exception(f"切换账号出错: {e}")
-
-
-class timer(QTimer):
-    """
-    检查wifi登录状态
-    """
-    def __init__(self):
+        
+class Update_timer(QTimer):
+    def __init__(self,bridge):
         super().__init__()
-        self.timeout.connect(self.update)
-        # 从配置读取间隔（默认 60000ms）
         try:
-            import os
-            from src import config
+            self.bridge = bridge
             main = config.CfgParse(os.getcwd()+"/config/main.toml")
             interval = int(main.get('main','timer_interval', 60000))
         except Exception:
             interval = 60000
-        self.start(max(10000, interval))
-        # 是否有一次检查正在进行，避免并发
-        self._running = False
-
+        self.setInterval(interval)
+        self.timeout.connect(self.update)
+        self.start()
     def update(self):
-        # 如果上一次检查尚未完成，则跳过本次定时
-        if getattr(self, '_running', False):
-            return
-
-        def check_wifi():
-            try:
-                state = awa.wifi.getState()
-                if state.state == "未登录":
-                    # 尝试登录一次（可能会阻塞，但运行在子线程）
-                    awa.wifi.login()
-                    state = awa.wifi.getState()
-                return state
-            except Exception as e:
-                # 在子线程记录异常并返回 None
-                logger.exception(f"check_wifi 异常: {e}")
-                return None
-
-        # 在独立线程中运行检查，使用现有 Worker
-        # 使用self.thread和self.worker避免被垃圾回收
-        self.thread = QThread()
-        self.worker = Worker(check_wifi)
-        self.worker.moveToThread(self.thread)
-        self.thread.started.connect(self.worker.run_task)
-
-        # 开始前设置运行标志
-        self._running = True
-
-        def _on_finished(result):
-            try:
-                if result is None:
-                    logger.warning("校园网状态检查失败")
-                else:
-                    logger.info(f"校园网状态更新：{result}")
-            finally:
-                
-                self._running = False
-      
-        self.worker.finished.connect(_on_finished)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.worker.finished.connect(self.thread.quit)
-        self.thread.finished.connect(self.thread.deleteLater)
-        self.thread.start()
-
-
+        state = self.bridge.wifi.getState()
+        if state.state == "未登录":
+            self.bridge.wifi.login()

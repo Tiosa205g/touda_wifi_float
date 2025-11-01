@@ -319,7 +319,10 @@ class wifi(QObject):
         """
         注销登录
         """
-        r = self.session.post(self.url, headers=self.header, data="opr=logout&ipv4or6=")
+        try:
+            r = self.session.post(self.url, headers=self.header, data="opr=logout&ipv4or6=",timeout=(1,2))
+        except requests.exceptions.Timeout:
+            return "注销请求超时，可能处于临时用户阶段或不在校园网环境"
         if r.status_code == 200:
             return r.content.decode()
         else:
@@ -334,7 +337,7 @@ class wifi(QObject):
             return False
         logger.info(f"校园网注销:{self.logout()}")
         r = self.session.post(self.url, headers=self.header, data=f"opr=pwdLogin&userName={self.name}&pwd={self.password}&ipv4or6=&rememberPwd=1")
-        self.__state = self.getState()
+        self.getState()
         if r.status_code == 200:
             msg = r.content.decode()
             if "logon success" in msg or "已在线" in msg:

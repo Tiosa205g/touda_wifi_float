@@ -2,7 +2,7 @@ import os
 import base64
 from typing import Dict, List
 
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout
 
@@ -438,8 +438,7 @@ class AccountsInterface(_BaseInterface):
             InfoBar.warning(title='不允许删除', content='0 号账户不能删除，只能修改', duration=2000, parent=self)
             return
         base = os.path.basename(self.accounts[idx])
-        dialog = Dialog("确认删除", f"确定删除 {base} ?")
-        if dialog.exec():
+        if Dialog("确认删除", f"确定删除 {base} ?").exec():
             try:
                 os.remove(self.accounts[idx])
                 InfoBar.success(title='已删除', content=base, duration=1200, parent=self)
@@ -613,7 +612,7 @@ class LinksInterface(_BaseInterface):
         data = self._load_all()
         if not t or t not in data or n not in data[t]:
             return
-        if Dialog("确认删除", f"删除 [{t}]/{n} ?", self).exec():
+        if Dialog("确认删除", f"删除 [{t}]/{n} ?").exec():
             del data[t][n]
             if not data[t]:
                 del data[t]

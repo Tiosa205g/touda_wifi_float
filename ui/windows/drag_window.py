@@ -1,4 +1,3 @@
-import ctypes
 from qframelesswindow import FramelessWindow
 from PySide6.QtCore import QPoint,Qt, QSize
 class DragWindow(FramelessWindow):

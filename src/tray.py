@@ -1,13 +1,7 @@
-import base64
 import os
-import sys
-from functools import partial
-
-from PySide6.QtWidgets import QSystemTrayIcon, QWidget
+from PySide6.QtWidgets import QSystemTrayIcon
 from qfluentwidgets import SystemTrayMenu, Action
-from qfluentwidgets import FluentIcon as FIF
 from src import config
-from src.win_float_ball import MyRoundMenu
 from ui.windows.settings_window import SettingsWindow
 from src.logging_config import logger
 from ui.components import ProfileCard
@@ -18,7 +12,7 @@ class Tray(QSystemTrayIcon):
         self.setIcon(parent.windowIcon())
         self.setToolTip('Touda WiFi')
 
-        self.profile = ProfileCard("res/ico/favicon.ico", "xxx", "xxx@stu.edu.cn",version)
+        self.profile = ProfileCard("res/ico/favicon.ico", "<UNK>", "<UNK>@stu.edu.cn",version)
 
         self.menu = SystemTrayMenu("touda_wifi", parent=parent)
         self.menu.addWidget(self.profile,selectable=False)
@@ -70,6 +64,7 @@ class Tray(QSystemTrayIcon):
         mainc.write('main','x',x)
         mainc.write('main','y',y)
         logger.info('quit')
-        sys.exit()
+        from PySide6.QtCore import QCoreApplication
+        QCoreApplication.instance().quit()
 
 
