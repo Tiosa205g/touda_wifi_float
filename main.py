@@ -57,6 +57,7 @@ if __name__ == '__main__':
     from src.touda import Worker
     from PySide6.QtCore import QThread
     from src import win_float_ball
+    from src.plugin_manager import Manager
     from src.tray import Tray
     from qfluentwidgets import setTheme, Theme
 
@@ -76,6 +77,7 @@ if __name__ == '__main__':
     win = win_float_ball.FloatBall(app.primaryScreen().size(),app)
     win.setWindowIcon(QIcon('res/ico/favicon.ico'))
     win.tray = Tray(win,VERSION)
+    win.pm = Manager(win.bridge.wifi,win.bridge.webvpn,VERSION,CONFIG_DIR,MAIN_CFG,LINKS_CFG)
 
     win.bridge.wifi.state_update.connect(win.tray.profile.onUpdateState)
     win.bridge.wifi.state_update.connect(lambda state : logger.info(f"校园网状态更新：{state}"))

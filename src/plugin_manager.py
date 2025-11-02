@@ -1,14 +1,24 @@
 import pluggy
 import os
 import importlib.util
-
+from .config import CfgParse
+class Api:
+    """通过start返回给插件的类，可以调用已实例化的类"""
+    def __init__(self,wifi,webvpn,version,cfg_dir,main_cfg,links_cfg):
+        self.wifi = wifi
+        self.webvpn = webvpn
+        self.cfg = CfgParse
+        self.VERSION = version
+        self.CFG_DIR = cfg_dir
+        self.MAIN_CFG = main_cfg
+        self.LINKS_CFG = links_cfg
 # 1. 定义钩子规范（插件需实现的接口）
 hook = pluggy.HookspecMarker("toudawifi")
 
 class PluginSpec:
     @hook
-    def start(self, name: str):
-        """插件加载时执行，传用户名称"""
+    def start(self,api)->bool:
+        """插件加载时执行,插件返回true才能被认为正确加载"""
     @hook
     def get_name(self)->str:
         """获取插件名字"""
@@ -18,7 +28,12 @@ class PluginSpec:
     @hook
     def on_setting(self):
         """当设置按钮被点击"""
-
+    @hook
+    def on_disable(self):
+        """当插件被禁用时"""
+    @hook 
+    def on_exit(self):
+        """程序退出时调用"""
 # 2. 遍历插件目录下所有子目录中的 main.py 并加载插件
 def load_all_plugins(plugin_root: str, pm: pluggy.PluginManager):
     """
@@ -54,15 +69,24 @@ def load_all_plugins(plugin_root: str, pm: pluggy.PluginManager):
             except Exception as e:
                 print(f"加载插件失败 {main_py_path}：{str(e)}")
 
+
+class Manager:
+    def __init__(self,wifi,webvpn,version,cfg_dir,main_cfg,links_cfg):
+        self.api = Api(wifi,webvpn,version,cfg_dir,main_cfg,links_cfg)
+        # 创建插件管理器并注册钩子规范
+        self.pm = pluggy.PluginManager("toudawifi")
+        self.pm.add_hookspecs(PluginSpec)
+        
+        # 加载 plugins 目录下所有子目录中的 main.py 插件
+        load_all_plugins(plugin_root="./plugins", pm=self.pm)
+
+        # 套娃获取可用插件列表，无效自动卸载
+        self.plugins = [x for x in [{'name':plg.get_name(),'description':plg.get_description(),'object':plg} if plg.start(self.api) else plg.on_disable() and self.pm.unregister(plg) for plg in self.pm.get_plugins()] if x is not None] # 插件字典列表
+        print(f'已加载的有效插件列表:{self.plugins}') 
+    def open_plg_setting(plg):
+        plg.on_setting()
+
+
 # 3. 初始化插件管理器并加载所有插件
 if __name__ == "__main__":
-    # 创建插件管理器并注册钩子规范
-    pm = pluggy.PluginManager("toudawifi")
-    pm.add_hookspecs(PluginSpec)
-    
-    # 加载 plugins 目录下所有子目录中的 main.py 插件
-    load_all_plugins(plugin_root="./plugins", pm=pm)
-    plugins = [(plg.get_name(),plg.get_description(),plg) for plg in pm.get_plugins()]
-    print(f'插件列表:{plugins}') # 插件名,插件对象的元组列表
-    # 调用钩子
-    print(f'插件返回：{pm.hook.start(name='example_user')}')
+    m = Manager(None,None) # 测试
