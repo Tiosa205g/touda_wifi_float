@@ -79,6 +79,12 @@ if __name__ == '__main__':
     win.tray = Tray(win,VERSION)
     win.pm = Manager(win.bridge.wifi,win.bridge.webvpn,VERSION,CONFIG_DIR,MAIN_CFG,LINKS_CFG)
 
+
+    # first_plg = win.pm.plugins[0]
+    # logger.info(win.pm.is_valid_func(first_plg['object'],'on_exit'))
+
+
+
     win.bridge.wifi.state_update.connect(win.tray.profile.onUpdateState)
     win.bridge.wifi.state_update.connect(lambda state : logger.info(f"校园网状态更新：{state}"))
     win.bridge.wifi.flux_update.connect(lambda total,used : win.ui.waterBall.set_progress((((total-used)*100/total) if total != 0 else 100)))

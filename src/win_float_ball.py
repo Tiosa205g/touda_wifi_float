@@ -73,6 +73,7 @@ class FloatBall(DragWindow):
         accountMenu = MyRoundMenu("账号")
         linkMenu = MyRoundMenu("链接")
         webvpnMenu = MyRoundMenu("webvpn相关")
+        pluginMenu = MyRoundMenu("插件")
         acc = []
         #curr = config.CfgParse(path+"/config/main.toml").get('main','current_account')
         i = 0
@@ -102,7 +103,16 @@ class FloatBall(DragWindow):
         self.mainMenu.addMenu(linkMenu)
         self.mainMenu.addMenu(webvpnMenu)
         self.mainMenu.addMenu(accountMenu)
-        
+        # 检查插件数
+        if len(self.pm.plugins) > 0:
+            for plg in self.pm.plugins:
+                p = plg['object']
+                if self.pm.is_valid_func(p,'get_menu'):
+                    plg_actions = [Action(text=a['function'],triggered=a['object']) for a in p.get_menu()]
+                    menu = MyRoundMenu(plg['name'])
+                    menu.addActions(plg_actions)
+                    pluginMenu.addMenu(menu)
+            self.mainMenu.addMenu(pluginMenu)
         self.mainMenu.addSeparator() #分割线
 
         self.mainMenu.addAction(Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True)))

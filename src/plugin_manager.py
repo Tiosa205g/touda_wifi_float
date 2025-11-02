@@ -28,6 +28,9 @@ class PluginSpec:
     def get_description(self)->str:
         """获取插件描述,支持markdown"""
     @hook
+    def get_menu(self)->list[dict]: # list[功能 - function]
+        """获取插件的菜单信息,需要返回list[{'function':'功能名','object':callable函数}]"""
+    @hook
     def on_setting(self):
         """当设置按钮被点击"""
     @hook
@@ -71,7 +74,7 @@ def load_all_plugins(plugin_root: str, pm: pluggy.PluginManager):
             except Exception as e:
                 logger.info(f"加载插件失败 {main_py_path}：{str(e)}")
 
-
+# 3. 初始化插件管理器并加载所有插件
 class Manager:
     def __init__(self,wifi,webvpn,version,cfg_dir,main_cfg,links_cfg):
         self.api = Api(wifi,webvpn,version,cfg_dir,main_cfg,links_cfg)
@@ -87,8 +90,10 @@ class Manager:
         logger.info(f'已加载的有效插件列表:{self.plugins}') 
     def open_plg_setting(plg):
         plg.on_setting()
+    def is_valid_func(self,plg,func_name:str)->bool:
+        return callable(getattr(plg,func_name,None))
 
 
-# 3. 初始化插件管理器并加载所有插件
-if __name__ == "__main__":
-    m = Manager(None,None) # 测试
+# if __name__ == "__main__":
+#     pm = Manager(None,None) # 测试
+#     first_plg = pm.plugins[0]
