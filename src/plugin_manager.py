@@ -2,6 +2,7 @@ import pluggy
 import os
 import importlib.util
 from .config import CfgParse
+from .logging_config import logger
 class Api:
     """通过start返回给插件的类，可以调用已实例化的类"""
     def __init__(self,wifi,webvpn,version,cfg_dir,main_cfg,links_cfg):
@@ -12,6 +13,7 @@ class Api:
         self.CFG_DIR = cfg_dir
         self.MAIN_CFG = main_cfg
         self.LINKS_CFG = links_cfg
+        self.logger = logger
 # 1. 定义钩子规范（插件需实现的接口）
 hook = pluggy.HookspecMarker("toudawifi")
 
@@ -52,7 +54,7 @@ def load_all_plugins(plugin_root: str, pm: pluggy.PluginManager):
                 # 动态导入 main.py 模块
                 spec = importlib.util.spec_from_file_location(module_name, main_py_path)
                 if not spec or not spec.loader:
-                    print(f"跳过无效文件：{main_py_path}")
+                    logger.info(f"跳过无效文件：{main_py_path}")
                     continue
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
@@ -62,12 +64,12 @@ def load_all_plugins(plugin_root: str, pm: pluggy.PluginManager):
                     plugin_class = module.Plugin
                     if isinstance(plugin_class, type):  # 确保是类
                         pm.register(plugin_class())
-                        print(f"已加载插件：{root}（来自 {main_py_path}）")
+                        logger.info(f"已加载插件：{root}（来自 {main_py_path}）")
                 else:
-                    print(f"警告：{main_py_path} 中未找到 Plugin 类")
+                    logger.info(f"警告：{main_py_path} 中未找到 Plugin 类")
             
             except Exception as e:
-                print(f"加载插件失败 {main_py_path}：{str(e)}")
+                logger.info(f"加载插件失败 {main_py_path}：{str(e)}")
 
 
 class Manager:
@@ -82,7 +84,7 @@ class Manager:
 
         # 套娃获取可用插件列表，无效自动卸载
         self.plugins = [x for x in [{'name':plg.get_name(),'description':plg.get_description(),'object':plg} if plg.start(self.api) else plg.on_disable() and self.pm.unregister(plg) for plg in self.pm.get_plugins()] if x is not None] # 插件字典列表
-        print(f'已加载的有效插件列表:{self.plugins}') 
+        logger.info(f'已加载的有效插件列表:{self.plugins}') 
     def open_plg_setting(plg):
         plg.on_setting()
 
