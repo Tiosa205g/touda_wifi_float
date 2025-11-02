@@ -1,8 +1,9 @@
 # 这是一个示例插件
 import pluggy
+import requests
 from pathlib import Path
 
-PLUGIN_NAME = 'example插件'
+PLUGIN_NAME = '汕大服务号插件'
 PLUGIN_VERSION = '1.0.0'
 PLUGIN_AUTHOR = 'tiosa'
 PLUGIN_PATH = Path(__file__).parent
@@ -65,8 +66,20 @@ class Plugin:  # 类名固定为 Plugin，不能变动，否则无法识别
     def get_menu(self)->list[dict]: # list[功能 - function]
         """获取插件的菜单信息,需要返回list[{'function':'功能名','object':callable函数}]"""
         menu = self.sdk.Menu()
-        menu.add_func('测试功能',self.hello_world)
+        menu.add_func('获取一卡通余额',self.hello_world)
         return menu.get_all()
     
-    def hello_world(self):
+    def query_card_remain(self):
         self.sdk.logger_info('hello world')
+
+    def query_card_records(self):
+        pass
+    
+    def apply_webvpn(self):
+        pass
+
+    def unbind_totp(self):
+        pass
+    
+    def bind_mac(self):
+        pass
