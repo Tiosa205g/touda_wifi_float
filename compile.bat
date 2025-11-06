@@ -9,6 +9,7 @@ set "OUTPUT_DIR=output"              :: Output directory
 set "ICON_PATH=res/ico/favicon.ico"  :: Icon file path
 set "DATA_FILES=res/ico/*.ico=res/ico/"  :: Data files mapping
 set "UPX_PATH=D:\upx-5.0.2-win64\upx.exe" ::若UPX在环境变量中，直接用"upx"；否则填完整路径如"tools/upx.exe"
+set "PLUGINS_PATH=plugins" ::插件目录
 :: 1. Check if virtual environment exists
 if not exist "%VENV_DIR%\Scripts\activate.bat" (
     echo Error: Virtual environment not found at "%VENV_DIR%"
@@ -49,6 +50,7 @@ echo Starting Nuitka compilation for "%SCRIPT_NAME%"...
     --mingw64 ^
     --standalone ^
     --output-dir="%OUTPUT_DIR%" ^
+    --include-package="%PLUGINS_PATH%" ^
     --windows-console-mode=disable ^
     !ICON_PARAM! ^
     !UPX_PARAM! ^
