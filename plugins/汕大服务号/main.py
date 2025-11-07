@@ -4,7 +4,7 @@ import pluggy
 import requests
 from bs4 import BeautifulSoup
 from pathlib import Path
-from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import QWidget,QVBoxLayout
 
@@ -92,9 +92,9 @@ class Plugin:  # 类名固定为 Plugin，不能变动，否则无法识别
             url_net = f'http://wechat.stu.edu.cn/wechat/stu_netms_service/stu_netms.aspx?openid={openid}'
             menu.add_funcs([
                 {'function':'进入一卡通页面',
-                 'object': (lambda *_, url=url_card: self.open_browser(url,'一卡通'))},
+                 'object': (lambda *_, url=url_card: QDesktopServices.openUrl(QUrl(url)))},
                 {'function':'进入网络服务页面',
-                 'object': (lambda *_, url=url_net: self.open_browser(url,'网络服务'))},
+                 'object': (lambda *_, url=url_net: QDesktopServices.openUrl(QUrl(url)))},
                 {'function':'解绑',
                  'object': (lambda *_, name=name: self.unbind_wechat(name))}
             ])
@@ -139,41 +139,3 @@ class Plugin:  # 类名固定为 Plugin，不能变动，否则无法识别
         if r.status_code == 200:
             return r.text.find('取消绑定成功') != -1
         return False
-    def open_browser(self,url:str,title:str):
-        self.browser = SimpleBrowser(url,title)
-        self.browser.show()
-class SimpleBrowser(QWidget):
-    def __init__(self,url:str,title:str):
-        super().__init__()
-        self.title = title
-        self.url = url
-        self.init_ui()
-        
-    def init_ui(self):
-        # 设置窗口基本属性
-        self.setWindowTitle(self.title)
-        self.setGeometry(100, 100, 500,500)  # x, y, 宽, 高
-        
-        # 创建布局管理器
-        layout = QVBoxLayout()
-        self.setLayout(layout)  # 直接给当前QWidget设置布局
-        
-        # 创建浏览器组件
-        self.web_view = QWebEngineView()
-        
-        # 添加浏览器到布局
-        layout.addWidget(self.web_view)
-        
-        # 加载网页
-        self.web_view.load(QUrl(self.url))
-        
-        # 显示加载进度
-        self.web_view.loadProgress.connect(self.update_progress)
-        
-    def update_progress(self, progress):
-        if progress < 100:
-            self.setWindowTitle(f"{self.title} - 加载中: {progress}%")
-        else:
-            self.setWindowTitle(f"{self.title} - 加载完成")
-
-    
