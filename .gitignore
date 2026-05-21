@@ -3,8 +3,7 @@
 *.pyd
 __pycache__/
 output/
-# 忽略所有 .toml 文件
-*.toml
+config/
 *.log
 *.exe
 .github/
