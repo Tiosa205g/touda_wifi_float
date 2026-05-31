@@ -1,9 +1,9 @@
 from typing import Any
+from py_mini_racer import MiniRacer
 
 import pyotp
 import json
 import requests
-import execjs
 import re
 import base64
 
@@ -108,7 +108,8 @@ class encrypt:
             .decode("utf-8")
             .replace("###this###is###r###", r)
         )
-        ctx = execjs.compile(js)
+        ctx = MiniRacer()
+        ctx.eval(js)
         result = ctx.call("getkey", id)
         return result
 
