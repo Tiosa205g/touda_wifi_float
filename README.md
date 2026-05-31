@@ -319,7 +319,7 @@ touda_wifi_float/
 
 - **UI 框架**：PySide6 + qfluentwidgets
 - **网络请求**：requests + lxml + beautifulsoup4
-- **加密**：pyotp + pyexecjs
+- **加密**：pyotp + ~~pyexecjs~~ mini-racer
 - **打包工具**：Nuitka / auto-py-to-exe
 
 ### 编译为可执行文件
@@ -361,7 +361,7 @@ auto-py-to-exe
 - `requests`: HTTP 请求
 - `pyotp`: OTP 动态口令
 - `lxml` + `beautifulsoup4`: HTML 解析
-- `pyexecjs`: JavaScript 执行
+- ~~`pyexecjs`~~ `mini-racer`: JavaScript 执行
 - `tomlkit`: TOML 配置文件处理
 - `pluggy`: 插件系统钩子
 
