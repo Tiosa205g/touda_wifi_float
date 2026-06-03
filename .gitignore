@@ -4,6 +4,7 @@
 __pycache__/
 output/
 config/
+config.toml
 *.log
 *.exe
 .github/

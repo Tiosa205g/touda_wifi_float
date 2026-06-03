@@ -166,6 +166,14 @@ class FloatBall(DragWindow):
                     menu.addActions(plg_actions)
                     pluginMenu.addMenu(menu)
             self.mainMenu.addMenu(pluginMenu)
+
+        self.mainMenu.addAction(
+            Action(
+                text="立即更新状态",
+                icon=FIF.SYNC,
+                triggered=self.update_timer.update,
+            )
+        )
         self.mainMenu.addSeparator()  # 分割线
 
         self.mainMenu.addAction(
