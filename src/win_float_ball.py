@@ -103,38 +103,39 @@ class FloatBall(DragWindow):
         linkMenu = MyRoundMenu("链接")
         webvpnMenu = MyRoundMenu("webvpn相关")
         pluginMenu = MyRoundMenu("插件")
-        acc = []
-        # curr = config.CfgParse(path+"/config/main.toml").get('main','current_account')
-        i = 0
-        for file in os.listdir("config"):
-            if "account_" in file and ".toml" in file:
-                acc.append("config/" + file)
-                now = config.CfgParse("config/" + file)
-                name = now.get("setting", "name")
-                password = base64.b64decode(
-                    now.get("setting", "password", "").encode("utf-8")
-                ).decode("utf-8")
-                if name and password:
-                    accountMenu.addAction(
-                        Action(
-                            text="切换为" + name,
-                            icon=FIF.CHAT,
-                            triggered=partial(self.change_account, name, password, i),
+
+        try:
+            i = 0
+            for file in os.listdir("config"):
+                if "account_" in file and ".toml" in file:
+                    now = config.CfgParse("config/" + file)
+                    name = now.get("setting", "name")
+                    password = base64.b64decode(
+                        now.get("setting", "password", "").encode("utf-8")
+                    ).decode("utf-8")
+                    if name and password:
+                        accountMenu.addAction(
+                            Action(
+                                text="切换为" + name,
+                                icon=FIF.CHAT,
+                                triggered=partial(self.change_account, name, password, i),
+                            )
                         )
-                    )
-                    i += 1
+                        i += 1
+            logger.info(f"已加载{i}个账号")
+        except Exception:
+            logger.exception("加载账号菜单失败")
 
-        logger.info(f"已加载{i}个账号")
-
-        linkMenu.addAction(
-            Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link)
-        )
-        # 移入webvpn相关
-        self.create_links_menu(linkMenu)
-        # 链接内还应加入子菜单选择类别，以及是否使用webvpn打开
+        try:
+            linkMenu.addAction(
+                Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link)
+            )
+            self.create_links_menu(linkMenu)
+        except Exception:
+            logger.exception("加载链接菜单失败")
 
         webvpnMenu.addActions(
-            [  # Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link),
+            [
                 Action(
                     text="复制一键登录链接",
                     icon=FIF.ACCEPT,
@@ -153,20 +154,24 @@ class FloatBall(DragWindow):
         self.mainMenu.addMenu(linkMenu)
         self.mainMenu.addMenu(webvpnMenu)
         self.mainMenu.addMenu(accountMenu)
-        # 检查插件数
-        if len(self.pm.plugins) > 0:
-            for plg in self.pm.plugins:
-                p = plg["object"]
-                if self.pm.is_valid_func(p, "get_menu"):
-                    plg_actions = [
-                        Action(text=a["function"], triggered=a["object"])
-                        for a in p.get_menu()
-                    ]
-                    menu = MyRoundMenu(plg["name"])
-                    menu.addActions(plg_actions)
-                    pluginMenu.addMenu(menu)
-            self.mainMenu.addMenu(pluginMenu)
 
+        try:
+            if len(self.pm.plugins) > 0:
+                for plg in self.pm.plugins:
+                    p = plg["object"]
+                    if self.pm.is_valid_func(p, "get_menu"):
+                        plg_actions = [
+                            Action(text=a["function"], triggered=a["object"])
+                            for a in p.get_menu()
+                        ]
+                        menu = MyRoundMenu(plg["name"])
+                        menu.addActions(plg_actions)
+                        pluginMenu.addMenu(menu)
+                self.mainMenu.addMenu(pluginMenu)
+        except Exception:
+            logger.exception("加载插件菜单失败")
+
+        self.mainMenu.addSeparator()
         self.mainMenu.addAction(
             Action(
                 text="立即更新状态",
@@ -174,8 +179,6 @@ class FloatBall(DragWindow):
                 triggered=self.update_timer.update,
             )
         )
-        self.mainMenu.addSeparator()  # 分割线
-
         self.mainMenu.addAction(
             Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True))
         )
@@ -234,22 +237,32 @@ class FloatBall(DragWindow):
         """
         复制一键登录webvpn的链接，不限设备
         """
-        link = self.bridge.webvpn.create_redirect_url("https://webvpn.stu.edu.cn/")
-        self.app.clipboard().setText(link)
+        try:
+            link = self.bridge.webvpn.create_redirect_url("https://webvpn.stu.edu.cn/")
+            self.app.clipboard().setText(link)
+        except Exception:
+            logger.exception("获取登录链接失败")
 
     def copy_totp(self):
         """
         复制6位totp口令
         """
-        key = self.bridge.webvpn.key
-        totp = self.bridge.webvpn.encrypt.gettotpkey(key)
-        self.app.clipboard().setText(totp)
+        try:
+            key = self.bridge.webvpn.key
+            totp = self.bridge.webvpn.encrypt.gettotpkey(key)
+            self.app.clipboard().setText(totp)
+        except Exception:
+            logger.exception("获取totp失败")
 
     def copy_twfid(self):
         """
         复制用于登录的twfid
         """
-        self.bridge.webvpn.autoLogin()
+        try:
+            self.bridge.webvpn.autoLogin()
+        except Exception:
+            logger.exception("自动登录webvpn失败，无法获取twfid")
+            return
         twfid = self.bridge.webvpn.twfid
         self.app.clipboard().setText(twfid)
 
@@ -259,9 +272,13 @@ class FloatBall(DragWindow):
             a.yesButton.setText("是")
             a.cancelButton.setText("否")
             if a.exec():
-                self.bridge.webvpn.autoLogin()
-                bilibili = touda.live_bilibili(self.bridge.webvpn.twfid)
-                url = bilibili.get_live_url(link)
+                try:
+                    self.bridge.webvpn.autoLogin()
+                    bilibili = touda.live_bilibili(self.bridge.webvpn.twfid)
+                    url = bilibili.get_live_url(link)
+                except Exception:
+                    logger.exception("解析bilibili直播失败")
+                    return
                 if len(url) > 0:
                     short_url = []
                     hash_put = {}
@@ -288,8 +305,12 @@ class FloatBall(DragWindow):
         w.yesButton.setText("是")
         w.cancelButton.setText("否")
         if w.exec():
-            url = self.bridge.webvpn.create_url(link)
-            webbrowser.open(url)
+            try:
+                url = self.bridge.webvpn.create_url(link)
+                webbrowser.open(url)
+            except Exception:
+                logger.exception("webvpn打开链接失败")
+                webbrowser.open(link)
         else:
             webbrowser.open(link)
 
@@ -328,10 +349,7 @@ class FloatBall(DragWindow):
             thread.started.connect(worker.run_task)
 
             def on_finished(result):
-                try:
-                    ok = bool(result)
-                except Exception:
-                    ok = False
+                ok = isinstance(result, bool) and result
                 if ok:
                     try:
                         main.write("main", "current_account", index)
