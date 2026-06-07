@@ -8,3 +8,4 @@ config.toml
 *.log
 *.exe
 .github/
+.vscode/

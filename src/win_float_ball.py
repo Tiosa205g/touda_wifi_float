@@ -333,22 +333,32 @@ class FloatBall(DragWindow):
                 )
             menu.addMenu(linkType)
 
+    _switch_thread = None
+
     def change_account(self, name, password, index, *args):
         """
         切换账号：放入后台线程执行，避免阻塞 UI
         """
+        if self._switch_thread is not None and self._switch_thread.isRunning():
+            logger.warning("账号切换正在进行中，忽略重复请求")
+            return
+
         try:
             main = config.CfgParse(path + "/config/main.toml")
 
             def do_switch():
                 return self.bridge.wifi.change_account(name, password)
 
+            from PySide6.QtCore import Qt as QtNS
+
             thread = QThread(self)
+            thread.setObjectName("account_switch")
             worker = touda.Worker(do_switch)
             worker.moveToThread(thread)
             thread.started.connect(worker.run_task)
 
             def on_finished(result):
+                self._switch_thread = None
                 ok = isinstance(result, bool) and result
                 if ok:
                     try:
@@ -358,20 +368,16 @@ class FloatBall(DragWindow):
                     logger.info("切换账号成功")
                 else:
                     logger.info("切换账号失败")
-                try:
-                    worker.deleteLater()
-                except Exception:
-                    pass
-                try:
-                    thread.quit()
-                    thread.wait(1000)
-                    thread.deleteLater()
-                except Exception:
-                    pass
 
-            worker.finished.connect(on_finished)
+            worker.finished.connect(on_finished, QtNS.QueuedConnection)
+            worker.finished.connect(worker.deleteLater)
+            worker.finished.connect(thread.quit)
+            thread.finished.connect(thread.deleteLater)
+
+            self._switch_thread = thread
             thread.start()
         except Exception as e:
+            self._switch_thread = None
             logger.exception(f"切换账号出错: {e}")
 
 
