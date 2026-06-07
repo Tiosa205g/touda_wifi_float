@@ -197,15 +197,58 @@ def set_static_ip(adapter_name: str, ip: str, subnet_mask: str, gateway: str = '
     return False, f'设置失败:\n{out[:200]}'
 
 
+def _get_static_dns(adapter_name: str) -> list[str]:
+    """获取适配器上的静态 DNS 服务器列表，DHCP 获取的返回空"""
+    out = _run_cmd(['netsh', 'interface', 'ip', 'show', 'dnsserver',
+                    f'name={adapter_name}'])
+    # 如果包含"静态配置的 DNS 服务器"说明是静态 DNS
+    lines = out.split('\n')
+    servers = []
+    in_static = False
+    for line in lines:
+        if '静态配置的 DNS 服务器' in line:
+            in_static = True
+            m = re.search(r'[\d.]+', line)
+            if m:
+                servers.append(m.group())
+        elif in_static:
+            m = re.search(r'^\s+([\d.]+)', line)
+            if m:
+                servers.append(m.group(1))
+            else:
+                break
+    return servers
+
+
+def _set_static_dns(adapter_name: str, servers: list[str]):
+    """恢复适配器的静态 DNS（先清空再逐个添加）"""
+    # 先切到 DHCP DNS 清掉所有静态 DNS
+    _run_cmd(['netsh', 'interface', 'ip', 'set', 'dnsserver',
+              f'name={adapter_name}', 'source=dhcp'])
+    # 再设回静态
+    for i, srv in enumerate(servers):
+        if i == 0:
+            _run_cmd(['netsh', 'interface', 'ip', 'set', 'dnsserver',
+                      f'name={adapter_name}', 'source=static', f'addr={srv}', 'register=primary'])
+        else:
+            _run_cmd(['netsh', 'interface', 'ip', 'add', 'dnsserver',
+                      f'name={adapter_name}', f'addr={srv}', f'index={i+1}'])
+
+
 def set_dhcp(adapter_name: str) -> tuple[bool, str]:
-    """恢复适配器为 DHCP 自动获取 IP"""
+    """恢复适配器为 DHCP 自动获取 IP（保留静态 DNS 不变）"""
     if not is_admin():
         return False, '需要管理员权限才能修改IP设置，请以管理员身份运行程序。'
+
+    # 保存现有的静态 DNS，恢复 DHCP 后重新写入
+    saved_dns = _get_static_dns(adapter_name)
 
     out = _run_cmd(['netsh', 'interface', 'ip', 'set', 'address',
                     f'name={adapter_name}', 'source=dhcp'])
     if '确定' in out or 'OK' in out or not out:
-        return True, f'{adapter_name} 已切换为 DHCP 自动获取 IP'
+        if saved_dns:
+            _set_static_dns(adapter_name, saved_dns)
+        return True, f'{adapter_name} 已切换为 DHCP 自动获取 IP（DNS 已保留）'
     if '需要提升' in out or 'elevation' in out.lower():
         return False, '需要管理员权限才能修改IP设置。'
     return False, f'设置失败:\n{out[:200]}'
@@ -661,11 +704,17 @@ class ScanResultDialog(QDialog):
 
     def _open_manual_with_ip(self, ip: str):
         dlg = ManualIpDialog(self.adapter, preset_ip=ip, parent=self)
-        dlg.exec()
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            InfoBar.success(title='IP 设置成功',
+                            content=f'{self.adapter["name"]} 已设置为 {ip}',
+                            parent=self, duration=3000)
 
     def _open_manual(self):
         dlg = ManualIpDialog(self.adapter, parent=self)
-        dlg.exec()
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            InfoBar.success(title='IP 设置成功',
+                            content=f'{self.adapter["name"]} 已设置',
+                            parent=self, duration=3000)
 
 
 class ManualIpDialog(QDialog):
@@ -763,10 +812,9 @@ class ManualIpDialog(QDialog):
         ok, msg = set_static_ip(adapter_name, ip, mask, gateway)
         if ok:
             _set_preferred_adapter_name(adapter_name)
-            InfoBar.success(title='成功', content=msg, parent=self, duration=2000)
             self.accept()
         else:
-            InfoBar.error(title='失败', content=msg, parent=self, duration=3000)
+            InfoBar.error(title='设置失败', content=msg, parent=self, duration=4000)
 
 
 # ---------------------------------------------------------------------------
@@ -802,8 +850,8 @@ class Plugin:
         menu = self.sdk.Menu()
         menu.add_funcs([
             {'function': '📋 查看网络信息', 'object': self.show_network_info},
-            {'function': '⬆ 向上扫描可用IP', 'object': self.scan_up},
-            {'function': '⬇ 向下扫描可用IP', 'object': self.scan_down},
+            {'function': '⬆ 向前扫描可用IP', 'object': self.scan_down},
+            {'function': '⬇ 向后扫描可用IP', 'object': self.scan_up},
             {'function': '🔧 手动设置IP', 'object': self.manual_set_ip},
             {'function': '🔄 恢复DHCP', 'object': self.revert_dhcp},
         ])
@@ -869,22 +917,24 @@ class Plugin:
         dlg = NetworkInfoDialog()
         dlg.exec()
 
+    def _adapter_picker(self, title: str) -> dict | None:
+        """弹窗选适配器，返回 adapter dict 或 None"""
+        sel = AdapterSelectDialog(title)
+        if sel.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return sel.selected_adapter()
+
     def _scan_with_adapter(self, direction: str):
         """先选适配器，再执行扫描"""
-        sel = AdapterSelectDialog(f'选择适配器 - {direction}')
-        if sel.exec() != QDialog.DialogCode.Accepted:
-            return
-        adapter = sel.selected_adapter()
+        adapter = self._adapter_picker(f'选择适配器 - {direction}')
         if not adapter or not adapter['ip'] or not adapter['mask']:
-            InfoBar.warning(title='无法扫描', content='所选适配器没有有效的 IP 或子网掩码', parent=None)
             return
-
         net = calc_network(adapter['ip'], adapter['mask'])
         if not net:
-            InfoBar.warning(title='计算失败', content='无法计算子网范围，请检查 IP 和子网掩码', parent=None)
+            InfoBar.warning(title='计算失败', content='无法计算子网范围', parent=None)
             return
 
-        if '向上' in direction:
+        if '向后' in direction:
             ips = get_ips_above(adapter['ip'], net, count=50)
         else:
             ips = get_ips_below(adapter['ip'], net, count=50)
@@ -897,46 +947,43 @@ class Plugin:
         dlg.exec()
 
     def scan_up(self):
-        self._scan_with_adapter('向上扫描')
+        self._scan_with_adapter('向后扫描')
 
     def scan_down(self):
-        self._scan_with_adapter('向下扫描')
+        self._scan_with_adapter('向前扫描')
 
     def manual_set_ip(self):
-        sel = AdapterSelectDialog('选择适配器')
-        sel.setWindowTitle('手动设置 IP - 选择适配器')
-        if sel.exec() != QDialog.DialogCode.Accepted:
-            return
-        adapter = sel.selected_adapter()
+        adapter = self._get_usable_adapter()
         if not adapter:
+            InfoBar.warning(title='无可用适配器', content='未检测到任何网络适配器', parent=None)
             return
         dlg = ManualIpDialog(adapter)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             preferred = dlg.combo_adapter.currentText()
             _set_preferred_adapter_name(preferred)
-            self.sdk.logger_info(f'已保存首选适配器: {preferred}')
+            InfoBar.success(title='IP 设置成功',
+                            content=f'{preferred} 已设置为 {dlg.edit_ip.text()}',
+                            parent=None, duration=3000)
+            self.sdk.logger_info(f'静态IP设置成功: {preferred} -> {dlg.edit_ip.text()}')
 
     def revert_dhcp(self):
-        sel = AdapterSelectDialog('恢复 DHCP')
-        sel.setWindowTitle('恢复 DHCP - 选择适配器')
-        if sel.exec() != QDialog.DialogCode.Accepted:
-            return
-        adapter = sel.selected_adapter()
+        adapter = self._adapter_picker('恢复 DHCP')
         if not adapter:
             return
 
         from qfluentwidgets import Dialog as FluentDialog
-        dlg = FluentDialog(
+        confirm = FluentDialog(
             f'确定要将「{adapter["name"]}」恢复为 DHCP 自动获取 IP 吗？',
             f'当前 IP: {adapter["ip"] or "未设置"}',
             parent=None
         )
-        if not dlg.exec():
+        if not confirm.exec():
             return
 
         ok, msg = set_dhcp(adapter['name'])
         if ok:
             _set_preferred_adapter_name(adapter['name'])
-            InfoBar.success(title='成功', content=msg, parent=None, duration=2000)
+            InfoBar.success(title='DHCP 恢复成功', content=msg, parent=None, duration=3000)
+            self.sdk.logger_info(f'DHCP 恢复成功: {adapter["name"]}')
         else:
             InfoBar.error(title='失败', content=msg, parent=None, duration=3000)

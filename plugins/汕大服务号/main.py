@@ -112,7 +112,7 @@ class Plugin:  # 类名固定为 Plugin，不能变动，否则无法识别
     def is_login(self,name:str)->bool:
         """判断是否登录"""
         open_id = self.get_encode_openid(name)
-        r = self.session.get(url=f'http://wechat.stu.edu.cn/wechat/login/login?source_type=dorm_information&openid={open_id}')
+        r = self.session.get(url=f'http://wechat.stu.edu.cn/wechat/login/login?source_type=dorm_information&openid={open_id}',timeout=3000)
         if r.status_code == 200:
             return r.text.find('登录') == -1 # 寻找是否有 登录 字样，如果未绑定就会有登录提示
         return False               
