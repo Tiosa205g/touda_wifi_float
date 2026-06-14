@@ -117,6 +117,12 @@ class encrypt:
 class webvpn(QObject):
     twfid_update: Signal = Signal(str)
 
+    # 类级别共享配置——所有实例及引用方共享同一份，设置界面保存后自动生效
+    _name = ""
+    _password = ""
+    _key = ""
+    _twfid = ""
+
     def __init__(self, name: str, password: str, key: str, twfid=""):
         """
         Args:
@@ -131,10 +137,11 @@ class webvpn(QObject):
         self.session.verify = False
         self.session.cookies.update({"TWFID": twfid})
 
-        self.name = name
-        self.password = password
-        self.key = key
-        self.twfid = twfid
+        # 写入类变量，同类所有实例共享同一份配置
+        webvpn._name = name
+        webvpn._password = password
+        webvpn._key = key
+        webvpn._twfid = twfid
 
         self.encrypt = encrypt()
         self.header = {
@@ -149,6 +156,46 @@ class webvpn(QObject):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0",
             "sec-fetch-site": "same-origin",
         }
+
+    # --- 类变量属性访问器，兼容 self.name / self.key / self.twfid 等写法 ---
+    @property
+    def name(self) -> str:
+        return webvpn._name
+
+    @name.setter
+    def name(self, value: str):
+        webvpn._name = value
+
+    @property
+    def password(self) -> str:
+        return webvpn._password
+
+    @password.setter
+    def password(self, value: str):
+        webvpn._password = value
+
+    @property
+    def key(self) -> str:
+        return webvpn._key
+
+    @key.setter
+    def key(self, value: str):
+        webvpn._key = value
+
+    @property
+    def twfid(self) -> str:
+        return webvpn._twfid
+
+    @twfid.setter
+    def twfid(self, value: str):
+        webvpn._twfid = value
+
+    @classmethod
+    def update_config(cls, name: str, password: str, key: str):
+        """供设置界面保存后调用，同步更新运行中的共享配置"""
+        cls._name = name
+        cls._password = password
+        cls._key = key
 
     def autoLogin(self):
         """
@@ -347,6 +394,10 @@ class wifi(QObject):
                 "name": self.name,
             }.__repr__()
 
+    # 类级别共享配置——所有实例及引用方共享同一份
+    _name = ""
+    _password = ""
+
     __state = None
     state_update: Signal = Signal(state)
     flux_update: Signal = Signal(float, float)
@@ -358,8 +409,9 @@ class wifi(QObject):
             password: 密码
         """
         super().__init__()
-        self.name = name
-        self.password = password
+        # 写入类变量
+        wifi._name = name
+        wifi._password = password
 
         self.session = requests.Session()
         self.session.trust_env = True
@@ -371,6 +423,29 @@ class wifi(QObject):
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
         }
+
+    # --- 类变量属性访问器，兼容 self.name / self.password 写法 ---
+    @property
+    def name(self) -> str:
+        return wifi._name
+
+    @name.setter
+    def name(self, value: str):
+        wifi._name = value
+
+    @property
+    def password(self) -> str:
+        return wifi._password
+
+    @password.setter
+    def password(self, value: str):
+        wifi._password = value
+
+    @classmethod
+    def update_config(cls, name: str, password: str):
+        """供设置界面保存后调用，同步更新运行中的共享配置"""
+        cls._name = name
+        cls._password = password
 
     def logout(self):
         """
@@ -491,60 +566,4 @@ class wifi(QObject):
         return state
 
 
-# if __name__ == "__main__":
-#
-#     twfid = "1c1341a18a0223dd"
-#     print(twfid)
-#     #a = webvpn("","","",twfid)
-#     print(a.autoLogin())
-#     print(a.twfid)
-#     import webbrowser
-#     url = a.create_url(get_vpn_url("https://www.baidu.com"))
-#     webbrowser.open(url)
-class live_bilibili:
-    def __init__(self, twfid: str = ""):
-        """
-        Args:
-            twfid: TWFID
-        """
-        self.session = requests.Session()
-        self.session.trust_env = True
-        self.session.verify = False
-        self.twfid = twfid
-        self.header = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36"
-        }
 
-    def set_twfid(self, twfid: str):
-        self.twfid = twfid
-
-    def get_live_url(self, bili_url: str) -> list:
-        url = []
-        res = self.session.get(
-            bili_url,
-            verify=False,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36"
-            },
-            cookies={"TWFID": self.twfid},
-            timeout=3,
-        )
-
-        if res.status_code == 200:
-            logger.info("请求成功！")
-            data = res.content.decode()
-            j = json.loads(
-                extract_text(data, "window.__NEPTUNE_IS_MY_WAIFU__=", "</script>")
-            )
-            streams = j["roomInitRes"]["data"]["playurl_info"]["playurl"]["stream"]
-
-            for i, stream in enumerate(streams):
-                for j, format_in in enumerate(stream["format"]):
-                    for k, codec in enumerate(format_in["codec"]):
-                        for l, url_info in enumerate(codec["url_info"]):
-                            url.append(
-                                url_info["host"] + codec["base_url"] + url_info["extra"]
-                            )
-                            # print(f"第{len(url)}个视频地址：http://hlsplayer-net-s.webvpn.stu.edu.cn:8118/embed?type=m3u8&src={url[-1]}")
-
-        return url

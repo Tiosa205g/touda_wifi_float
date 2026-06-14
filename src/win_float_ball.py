@@ -1,10 +1,11 @@
 import os
+import re
 import webbrowser
 import base64
 from functools import partial
 from PySide6.QtCore import QPoint, QTimer, QThread
 from PySide6.QtGui import Qt
-from PySide6.QtWidgets import QApplication, QInputDialog
+from PySide6.QtWidgets import QApplication
 from qfluentwidgets import TeachingTip, RoundMenu, Action, Dialog
 from qfluentwidgets import FluentIcon as FIF
 from ui.float_ball import UI_FloatBall
@@ -36,32 +37,6 @@ class MyRoundMenu(RoundMenu):
             self._hideMenu(True)
 
 
-class handle:
-    def __init__(self):
-        self.main = config.CfgParse(path + "/config/main.toml")
-        self.current = config.CfgParse(
-            path + f"/config/account_{self.main.get('main','current_account',0)}.toml"
-        )
-        webvpn_name = self.main.get("webvpn", "name", "")
-        webvpn_password = base64.b64decode(
-            self.main.get("webvpn", "password", "").encode("utf-8")
-        ).decode("utf-8")
-        webvpn_key = self.main.get("webvpn", "key", "")
-        webvpn_twfid = self.main.get("webvpn", "twfid", "")
-        name = self.current.get("setting", "name", "")
-        password = base64.b64decode(
-            self.current.get("setting", "password", "").encode("utf-8")
-        ).decode("utf-8")
-
-        self.wifi = touda.wifi(name, password)
-        self.webvpn = touda.webvpn(
-            webvpn_name, webvpn_password, webvpn_key, webvpn_twfid
-        )
-        self.webvpn.twfid_update.connect(
-            lambda twfid: self.main.write("webvpn", "twfid", twfid)
-        )
-
-
 class FloatBall(DragWindow):
     def __init__(self, screen_size, app: QApplication):
         super().__init__()
@@ -76,11 +51,32 @@ class FloatBall(DragWindow):
         self.ui.waterBall.customContextMenuRequested.connect(self.waterBall_menu)
         self.ui.waterBall.doubleClicked.connect(self.waterBall_double_click)
 
-        # self.ui.waterBall.rightClicked.connect(self.waterBall_right_clicked)
+        # 初始化配置和核心对象
+        self.main_cfg = config.CfgParse(path + "/config/main.toml")
+        current_cfg = config.CfgParse(
+            path + f"/config/account_{self.main_cfg.get('main','current_account',0)}.toml"
+        )
+        webvpn_name = self.main_cfg.get("webvpn", "name", "")
+        webvpn_password = base64.b64decode(
+            self.main_cfg.get("webvpn", "password", "").encode("utf-8")
+        ).decode("utf-8")
+        webvpn_key = self.main_cfg.get("webvpn", "key", "")
+        webvpn_twfid = self.main_cfg.get("webvpn", "twfid", "")
+        name = current_cfg.get("setting", "name", "")
+        password = base64.b64decode(
+            current_cfg.get("setting", "password", "").encode("utf-8")
+        ).decode("utf-8")
 
-        self.bridge = handle()
-        self.update_timer = Update_timer(self.bridge)
-        x, y = self.bridge.main.get("main", "x", 0), self.bridge.main.get(
+        self.wifi = touda.wifi(name, password)
+        self.webvpn = touda.webvpn(
+            webvpn_name, webvpn_password, webvpn_key, webvpn_twfid
+        )
+        self.webvpn.twfid_update.connect(
+            lambda twfid: self.main_cfg.write("webvpn", "twfid", twfid)
+        )
+
+        self.update_timer = Update_timer(self.wifi)
+        x, y = self.main_cfg.get("main", "x", 0), self.main_cfg.get(
             "main", "y", 0
         )  # 设置初始位置为上一次关闭位置
         self.move(x, y)
@@ -97,7 +93,7 @@ class FloatBall(DragWindow):
             parent=self.ui.waterBall,
         )
 
-    def waterBall_menu(self, pos, ret: bool = False):
+    def waterBall_menu(self, pos):
         self.mainMenu = MyRoundMenu()
         accountMenu = MyRoundMenu("账号")
         linkMenu = MyRoundMenu("链接")
@@ -137,7 +133,7 @@ class FloatBall(DragWindow):
         webvpnMenu.addActions(
             [
                 Action(
-                    text="复制一键登录链接",
+                    text="一键登录链接",
                     icon=FIF.ACCEPT,
                     triggered=self.copy_login_link,
                 ),
@@ -186,43 +182,26 @@ class FloatBall(DragWindow):
         self.mainMenu.exec(self.mapToGlobal(pos))
 
     def clipboard_convert_webvpn(self):
-        import re
-
         count = 0
         convert_count = 0
 
         cb = self.app.clipboard()
         site = cb.text()
 
-        # ([a-zA-z]+://)([^/]*)(/.*)
         it = re.finditer("(https?://)([^/]*)(/.*)", site, re.I)
 
         for match in it:
-            all = match.group()
-            protocol = match.group(1)
-            domain = match.group(2)
-            args = match.group(3)
-
+            all_url = match.group()
             count += 1
 
-            if "webvpn.stu.edu.cn:8118" in all:
+            if "webvpn.stu.edu.cn:8118" in all_url:
                 continue
 
-            web = domain.replace("-", "--").replace(".", "-")
-            if ":" in web:
-                web = web.replace(":", "-") + "-p"
-            web = protocol + web
-            if "https" not in web:
-                site = site.replace(
-                    all, web + ".webvpn.stu.edu.cn:8118" + args, 1
-                )  # http
-            else:
-                site = site.replace(
-                    all,
-                    web.replace("https", "http") + "-s.webvpn.stu.edu.cn:8118" + args,
-                    1,
-                )  # https
-            convert_count += 1
+            vpn_url = touda.get_vpn_url(all_url)
+            if vpn_url:
+                site = site.replace(all_url, vpn_url, 1)
+                convert_count += 1
+
         cb.setText(site)
         logger.info(f"转换结果: 共识别到{count}个链接,成功修改{convert_count}个链接")
 
@@ -235,11 +214,21 @@ class FloatBall(DragWindow):
 
     def copy_login_link(self):
         """
-        复制一键登录webvpn的链接，不限设备
+        一键登录webvpn：询问是否在浏览器打开，否则复制链接
         """
         try:
-            link = self.bridge.webvpn.create_redirect_url("https://webvpn.stu.edu.cn/")
-            self.app.clipboard().setText(link)
+            link = self.webvpn.create_redirect_url("https://webvpn.stu.edu.cn/")
+            w = Dialog(
+                "一键登录链接",
+                "是否在浏览器中打开一键登录链接？",
+                self,
+            )
+            w.yesButton.setText("打开浏览器")
+            w.cancelButton.setText("复制到剪贴板")
+            if w.exec():
+                webbrowser.open(link)
+            else:
+                self.app.clipboard().setText(link)
         except Exception:
             logger.exception("获取登录链接失败")
 
@@ -248,8 +237,8 @@ class FloatBall(DragWindow):
         复制6位totp口令
         """
         try:
-            key = self.bridge.webvpn.key
-            totp = self.bridge.webvpn.encrypt.gettotpkey(key)
+            key = self.webvpn.key
+            totp = self.webvpn.encrypt.gettotpkey(key)
             self.app.clipboard().setText(totp)
         except Exception:
             logger.exception("获取totp失败")
@@ -259,44 +248,14 @@ class FloatBall(DragWindow):
         复制用于登录的twfid
         """
         try:
-            self.bridge.webvpn.autoLogin()
+            self.webvpn.autoLogin()
         except Exception:
             logger.exception("自动登录webvpn失败，无法获取twfid")
             return
-        twfid = self.bridge.webvpn.twfid
+        twfid = self.webvpn.twfid
         self.app.clipboard().setText(twfid)
 
     def open_link_window(self, name: str, link: str, *args):
-        if "live" in link and "bilibili" in link:
-            a = Dialog("匹配到bilibili直播链接", f"是否使用使用解析打开{name}", self)
-            a.yesButton.setText("是")
-            a.cancelButton.setText("否")
-            if a.exec():
-                try:
-                    self.bridge.webvpn.autoLogin()
-                    bilibili = touda.live_bilibili(self.bridge.webvpn.twfid)
-                    url = bilibili.get_live_url(link)
-                except Exception:
-                    logger.exception("解析bilibili直播失败")
-                    return
-                if len(url) > 0:
-                    short_url = []
-                    hash_put = {}
-                    for i, x in enumerate(url):
-                        short_url.append(x[:30] + str(i))
-                        hash_put.update({short_url[-1]: x})
-
-                    item, ok = QInputDialog.getItem(
-                        self, "选择视频地址", "请选择", short_url, 0, editable=False
-                    )
-                    if ok:
-                        url = (
-                            "http://hlsplayer-net-s.webvpn.stu.edu.cn:8118/embed?type=m3u8&src="
-                            + hash_put[item]
-                        )
-                        webbrowser.open(url)
-
-                return
         w = Dialog(
             "选择:",
             f"是否使用webvpn打开{name[:70] + ('...' if len(name) > 70 else '')}",
@@ -306,7 +265,9 @@ class FloatBall(DragWindow):
         w.cancelButton.setText("否")
         if w.exec():
             try:
-                url = self.bridge.webvpn.create_url(link)
+                url = touda.get_vpn_url(link)
+                if self.webvpn.twfid:
+                    url = f"https://webvpn.stu.edu.cn/portal/shortcut.html?twfid={self.webvpn.twfid}&url={url}"
                 webbrowser.open(url)
             except Exception:
                 logger.exception("webvpn打开链接失败")
@@ -347,7 +308,7 @@ class FloatBall(DragWindow):
             main = config.CfgParse(path + "/config/main.toml")
 
             def do_switch():
-                return self.bridge.wifi.change_account(name, password)
+                return self.wifi.change_account(name, password)
 
             from PySide6.QtCore import Qt as QtNS
 
@@ -382,10 +343,10 @@ class FloatBall(DragWindow):
 
 
 class Update_timer(QTimer):
-    def __init__(self, bridge):
+    def __init__(self, wifi):
         super().__init__()
         try:
-            self.bridge = bridge
+            self.wifi = wifi
             main = config.CfgParse(os.getcwd() + "/config/main.toml")
             interval = int(main.get("main", "timer_interval", 60000))
         except Exception:
@@ -395,6 +356,6 @@ class Update_timer(QTimer):
         self.start()
 
     def update(self):
-        state = self.bridge.wifi.getState()
+        state = self.wifi.getState()
         if state.state == "未登录":
-            self.bridge.wifi.login()
+            self.wifi.login()

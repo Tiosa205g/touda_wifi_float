@@ -1,5 +1,6 @@
 import sys
 import os
+from pathlib import Path
 
 # import init
 from src.logging_config import logger
@@ -12,15 +13,16 @@ LINKS_CFG = os.path.join(CONFIG_DIR, "links.toml")
 
 
 def init_config():
-    newFile = ["main", "account_0", "links"]
+    new_files = ["main", "account_0", "links"]
     logger.info("检查配置目录...")
     if not os.path.exists("config"):
         logger.info("正在初始化配置...")
         os.mkdir("config")
 
-        list(map(lambda x: open("config/{}.toml".format(x), "w"), newFile))  # 创建文件
+        for file in new_files:
+            Path(f"config/{file}.toml").touch()
 
-        cfg = [x for x in map(lambda x: CfgParse("config/{}.toml".format(x)), newFile)]
+        cfg = [CfgParse(f"config/{file}.toml") for file in new_files]
         cfg[0].write("main", "current_account", "0")
 
         # 写入默认链接
@@ -28,16 +30,9 @@ def init_config():
         cfg[2].write("汕大", "教务系统", "https://jw.stu.edu.cn/")
         cfg[2].write("汕大", "mystu", "https://my.stu.edu.cn/")
     else:
-        list(
-            map(
-                lambda x: (
-                    ""
-                    if os.path.exists("config/{}.toml".format(x))
-                    else open("config/{}.toml".format(x), "w")
-                ),
-                newFile,
-            )
-        )
+        for file in new_files:
+            if not os.path.exists(f"config/{file}.toml"):
+                Path(f"config/{file}.toml").touch()
 
 
 if __name__ == "__main__":
@@ -92,17 +87,18 @@ if __name__ == "__main__":
     win.setWindowIcon(QIcon("res/ico/favicon.ico"))
     win.tray = Tray(win, VERSION)
     win.pm = Manager(
-        win.bridge.wifi, win.bridge.webvpn, VERSION, CONFIG_DIR, MAIN_CFG, LINKS_CFG
+        win.wifi, win.webvpn, VERSION, CONFIG_DIR, MAIN_CFG, LINKS_CFG,
+        app=app, parent=win
     )
 
     # first_plg = win.pm.plugins[0]
     # logger.info(win.pm.is_valid_func(first_plg['object'],'on_exit'))
 
-    win.bridge.wifi.state_update.connect(win.tray.profile.onUpdateState)
-    win.bridge.wifi.state_update.connect(
+    win.wifi.state_update.connect(win.tray.profile.onUpdateState)
+    win.wifi.state_update.connect(
         lambda state: logger.info(f"校园网状态更新：{state}")
     )
-    win.bridge.wifi.flux_update.connect(
+    win.wifi.flux_update.connect(
         lambda total, used: win.ui.waterBall.set_progress(
             (((total - used) * 100 / total) if total != 0 else 100)
         )
@@ -127,10 +123,10 @@ if __name__ == "__main__":
         return thread, worker
 
     wifi_thread, wifi_worker = start_worker_in_thread(
-        win.bridge.wifi.login, "校园网登录"
+        win.wifi.login, "校园网登录"
     )
     webvpn_thread, webvpn_worker = start_worker_in_thread(
-        win.bridge.webvpn.autoLogin, "webvpn登录"
+        win.webvpn.autoLogin, "webvpn登录"
     )
 
     win.show()

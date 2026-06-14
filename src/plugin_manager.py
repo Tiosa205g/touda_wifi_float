@@ -5,7 +5,7 @@ from .config import CfgParse
 from .logging_config import logger
 class Api:
     """通过start返回给插件的类，可以调用已实例化的类"""
-    def __init__(self,wifi,webvpn,version,cfg_dir,main_cfg,links_cfg):
+    def __init__(self,wifi,webvpn,version,cfg_dir,main_cfg,links_cfg,app=None,parent=None):
         self.wifi = wifi
         self.webvpn = webvpn
         self.cfg = CfgParse
@@ -14,6 +14,8 @@ class Api:
         self.MAIN_CFG = main_cfg
         self.LINKS_CFG = links_cfg
         self.logger = logger
+        self.app = app
+        self.parent = parent
 # 1. 定义钩子规范（插件需实现的接口）
 hook = pluggy.HookspecMarker("toudawifi")
 
@@ -76,8 +78,8 @@ def load_all_plugins(plugin_root: str, pm: pluggy.PluginManager):
 
 # 3. 初始化插件管理器并加载所有插件
 class Manager:
-    def __init__(self,wifi,webvpn,version,cfg_dir,main_cfg,links_cfg):
-        self.api = Api(wifi,webvpn,version,cfg_dir,main_cfg,links_cfg)
+    def __init__(self,wifi,webvpn,version,cfg_dir,main_cfg,links_cfg,app=None,parent=None):
+        self.api = Api(wifi,webvpn,version,cfg_dir,main_cfg,links_cfg,app,parent)
         # 创建插件管理器并注册钩子规范
         self.pm = pluggy.PluginManager("toudawifi")
         self.pm.add_hookspecs(PluginSpec)

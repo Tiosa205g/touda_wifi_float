@@ -290,6 +290,9 @@ class WebVpnInterface(_BaseInterface):
         self.mainCfg.write('webvpn', 'name', name)
         self.mainCfg.write('webvpn', 'password', write_b64(pwd))
         self.mainCfg.write('webvpn', 'key', key)
+        # 同步更新运行中的 webvpn 对象（类变量共享），无需重启立即生效
+        from src.touda import webvpn as WebVpnCls
+        WebVpnCls.update_config(name, pwd, key)
         InfoBar.success(title='已保存', content='WebVPN 设置已保存', duration=1500, parent=self)
 
     def copyTwfid(self):
