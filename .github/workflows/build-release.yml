@@ -33,19 +33,24 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --extra dev
 
       - name: Setup MSVC compiler environment
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Compile with Nuitka
         run: |
-          uv run nuitka --lto=no --jobs=2 --onefile --standalone `
-            --output-dir=output --windows-console-mode=disable `
+          uv run nuitka --onefile --standalone `
+            --jobs=3 --lto=no `
+            --assume-yes-for-downloads `
+            --output-dir=output `
+            --windows-disable-console `
+            --windows-icon-from-ico=res/ico/favicon.ico `
             --enable-plugin=pyside6 --include-qt-plugins=sensible,styles `
-            --include-data-files=res/ico/*.ico=res/ico/ `
-            --windows-disable-console --follow-imports `
-            --show-progress --show-memory `
+            --include-data-dir=res/ico=res/ico `
+            --follow-imports `
+            --remove-output `
+            --show-memory `
             main.py
 
       - name: Prepare release artifacts
