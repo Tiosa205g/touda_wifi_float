@@ -3,7 +3,7 @@
 <div align="center">
 
 ![Version](https://img.shields.io/badge/version-v1.4.5-blue)
-![Python](https://img.shields.io/badge/python-3.8+-green)
+![Python](https://img.shields.io/badge/python-3.12+-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
 一款为汕头大学校园网设计的桌面悬浮球工具，集成校园网登录、WebVPN 访问、流量监控与插件扩展等功能。
@@ -75,8 +75,9 @@
 
 #### 环境要求
 
-- Python 3.8 或更高版本
+- Python 3.12 或更高版本
 - Windows 操作系统
+- [uv](https://docs.astral.sh/uv/) 包管理器（推荐）
 
 #### 安装步骤
 
@@ -90,16 +91,16 @@ cd touda_wifi_float
 2. **安装依赖**
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 3. **运行程序**
 
 ```bash
-python main.py
+uv run python main.py
 ```
 
-提示：从源码运行若使用插件功能，请确保已安装 pluggy（通常包含在 `requirements.txt`，如未安装请执行 `pip install pluggy`）。
+提示：从源码运行若使用插件功能，请确保已安装 pluggy（已包含在项目依赖中，`uv sync` 会自动安装）。
 
 ## ⚙️ 配置
 
@@ -244,25 +245,34 @@ plugins/
 
 ```python
 # plugins/Example/main.py
-from typing import List, Dict
+import pluggy
+from pathlib import Path
 
-class Plugin:
-    def __init__(self):
-        self.api = None  # 将在 start 时注入
+PLUGIN_NAME = '示例插件'
+PLUGIN_VERSION = '1.0.0'
+PLUGIN_PATH = Path(__file__).parent
 
+# 使用与主程序一致的标识，不可修改
+hook = pluggy.HookimplMarker("toudawifi")
+
+class Plugin:  # 类名必须为 Plugin，不可修改
+    @hook
     def start(self, api) -> bool:
         """插件加载时调用，返回 True 代表加载成功"""
         self.api = api
         # 可使用 api.wifi / api.webvpn 进行业务操作
         return True
 
+    @hook
     def get_name(self) -> str:
-        return "示例插件"
+        return PLUGIN_NAME
 
+    @hook
     def get_description(self) -> str:
         return "一个最小可用的示例插件。"
 
-    def get_menu(self) -> List[Dict]:
+    @hook
+    def get_menu(self) -> list[dict]:
         # 在悬浮球菜单中添加一个动作
         return [{
             'function': '示例动作',
@@ -270,7 +280,6 @@ class Plugin:
         }]
 
     def on_click(self):
-        # 这里可以调用 self.api.webvpn / self.api.wifi 等
         self.api.logger.info("示例动作被点击")
 
     # 可选钩子：on_setting / on_disable / on_exit
@@ -284,8 +293,19 @@ class Plugin:
 - `api.VERSION`: 主程序版本号
 - `api.CFG_DIR` / `api.MAIN_CFG` / `api.LINKS_CFG`: 配置目录与核心配置文件路径
 - `api.logger`: 日志记录器
+- `api.app`: QApplication 实例
+- `api.parent`: 悬浮球主窗口对象
 
 注意：插件应当做好异常处理，避免阻塞 UI 线程；可结合线程/异步在合适的线程中执行耗时任务。
+
+### 内置插件
+
+| 插件 | 说明 |
+|------|------|
+| `example` | 示例插件，展示插件开发的基本结构与 SDK 用法 |
+| `bilibili` | B站直播间链接解析播放 |
+| `汕大服务号` | 集成汕大服务号相关功能 |
+| `切换ip` | 静态地址切换，支持配置多组网络地址 |
 
 ## 🛠️ 开发
 
@@ -294,48 +314,63 @@ class Plugin:
 ```
 touda_wifi_float/
 ├── main.py                 # 程序入口
-├── requirements.txt        # 依赖列表
-├── compile.bat            # 编译脚本
-├── config/                # 配置文件目录
-├── src/                   # 核心功能模块
-│   ├── touda.py          # 校园网/WebVPN 核心逻辑
-│   ├── config.py         # 配置文件处理
-│   ├── tray.py           # 系统托盘
-│   ├── win_float_ball.py # 悬浮球主窗口
-│   └── logging_config.py # 日志配置
-├── ui/                    # 界面模块
-│   ├── float_ball.py     # 悬浮球 UI
-│   ├── components/       # UI 组件
-│   │   ├── waterball.py  # 水球组件
-│   │   └── profile.py    # 配置文件组件
-│   └── windows/          # 窗口组件
-│       ├── drag_window.py    # 拖拽窗口
-│       └── settings_window.py # 设置窗口
-└── res/                   # 资源文件
-    └── ico/              # 图标资源
+├── pyproject.toml          # 项目配置与依赖声明（uv）
+├── compile.bat             # 编译脚本（Nuitka）
+├── config/                 # 配置文件目录
+├── src/                    # 核心功能模块
+│   ├── touda.py            # 校园网/WebVPN 核心逻辑
+│   ├── config.py           # 配置文件处理
+│   ├── plugin_manager.py   # 插件管理器（基于 pluggy）
+│   ├── tray.py             # 系统托盘
+│   ├── win_float_ball.py   # 悬浮球主窗口
+│   └── logging_config.py   # 日志配置
+├── ui/                     # 界面模块
+│   ├── float_ball.py       # 悬浮球 UI
+│   ├── components/         # UI 组件
+│   │   ├── waterball.py    # 水球组件
+│   │   └── profile.py      # 配置文件组件
+│   └── windows/            # 窗口组件
+│       ├── drag_window.py      # 拖拽窗口
+│       └── settings_window.py  # 设置窗口
+├── plugins/                # 插件目录
+│   ├── example/            # 示例插件
+│   ├── bilibili/           # B站直播解析插件
+│   ├── 汕大服务号/          # 汕大服务号插件
+│   └── 切换ip/             # 静态地址切换插件
+├── res/                    # 资源文件
+│   └── ico/                # 图标资源
+├── output/                 # 编译输出目录
+└── .github/workflows/      # CI/CD 工作流
 ```
 
 ### 技术栈
 
-- **UI 框架**：PySide6 + qfluentwidgets
+- **UI 框架**：PySide6 + pyside6-fluent-widgets + pysidesix-frameless-window
 - **网络请求**：requests + lxml + beautifulsoup4
-- **加密**：pyotp + ~~pyexecjs~~ mini-racer
-- **打包工具**：Nuitka / auto-py-to-exe
+- **OTP/加密**：pyotp + mini-racer
+- **包管理**：uv + pyproject.toml
+- **打包工具**：Nuitka（支持 GitHub Actions 自动构建）
 
 ### 编译为可执行文件
 
-> 需要自行配置upx
+#### 使用 GitHub Actions（推荐）
 
-#### 使用 Nuitka（推荐）
+推送 `v*` 格式的 tag 即可自动触发构建工作流，编译产物将作为 Release 附件发布：
 
 ```bash
-# 1）建议先创建并激活虚拟环境（Windows 示例）
-# python -m venv .venv
-# .venv\Scripts\activate
-# 2）安装依赖
-# pip install -r requirements.txt
-# 3）运行打包脚本
+git tag v1.x.x
+git push origin v1.x.x
+```
+
+#### 本地使用 Nuitka
+
+```bash
+# 1）安装依赖（含 nuitka）
+uv sync --extra dev
+# 2）运行打包脚本
 compile.bat
+# 或直接使用 uv run：
+uv run nuitka --onefile --standalone --mingw64 --output-dir=output --windows-disable-console --windows-icon-from-ico=res/ico/favicon.ico --enable-plugin=pyside6 --include-qt-plugins=sensible,styles --include-data-dir=res/ico=res/ico --follow-imports main.py
 ```
 
 说明：
@@ -345,25 +380,20 @@ compile.bat
 - UPX 可选，如需启用，请确保本机已安装并在脚本中配置路径或加入 PATH
 - Nuitka 可能需要编译器（MSVC 或 MinGW-w64），按提示安装或让 Nuitka 自动下载
 
-#### 使用 auto-py-to-exe
-
-```bash
-auto-py-to-exe
-# 在 GUI 中导入main_compile.json后编译
-```
-
 ### 依赖包
 
-核心依赖：
+核心依赖（详见 `pyproject.toml`）：
 
 - `PySide6`: Qt6 Python 绑定
-- `qfluentwidgets`: Fluent Design UI 组件库
+- `pyside6-fluent-widgets`: Fluent Design UI 组件库
+- `pysidesix-frameless-window`: 无边框窗口支持
 - `requests`: HTTP 请求
 - `pyotp`: OTP 动态口令
 - `lxml` + `beautifulsoup4`: HTML 解析
-- ~~`pyexecjs`~~ `mini-racer`: JavaScript 执行
+- `mini-racer`: JavaScript 执行（无需安装 Node.js）
 - `tomlkit`: TOML 配置文件处理
 - `pluggy`: 插件系统钩子
+- `pywin32`: Windows API 调用
 
 ## 🐛 常见问题
 
@@ -400,14 +430,40 @@ A:
 
 A:
 
-1. 确认 Python 版本 >= 3.8
-2. 重新安装依赖：`pip install -r requirements.txt`
+1. 确认 Python 版本 >= 3.12
+2. 重新安装依赖：`uv sync`
 3. 检查是否有杀毒软件拦截
-4. 若缺少 `pluggy` 导致插件系统报错，请手动安装：`pip install pluggy`
+4. 若缺少 `pluggy` 导致插件系统报错，请手动安装：`uv add pluggy`
 
 ## 📝 更新日志
 
-### v1.4.0（当前版本）
+### v1.4.5（当前版本）
+
+- 🔧 优化项目代码，修复设置中修改 key 不会立即生效的问题
+- 🐛 修复切换账号有时会闪退的问题
+- 🔧 优化部分插件功能
+- 🤖 加入 GitHub Actions 自动构建工作流
+- 📦 更新依赖（lxml 6.1.0, urllib3 2.7.0, idna 3.15, requests 2.33.0）
+
+### v1.4.4
+
+- 🐛 修正更新状态的位置，完善 try-catch 嵌套
+
+### v1.4.3
+
+- ✨ 加入静态地址修改插件
+- ✨ 右键菜单加入立即更新状态功能
+
+### v1.4.2
+
+- 🔄 更换 pyexecjs 为 mini-racer，去除对 Node.js 的依赖
+- 📦 迁移至 uv 包管理器
+
+### v1.4.1
+
+- 🐛 修复部分闪退问题
+
+### v1.4.0
 
 - 🧩 新增插件系统，支持在 `plugins/` 下动态加载插件，并集成到右键菜单
 - ✨ 加入汕大服务号插件
@@ -460,7 +516,8 @@ A:
 ## 💖 致谢
 
 - [PySide6](https://www.qt.io/qt-for-python)
-- [qfluentwidgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets)
+- [PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets)
+- [uv](https://docs.astral.sh/uv/)
 
 ---
 
