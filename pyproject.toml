@@ -16,7 +16,7 @@ dependencies = [
     "pywin32>=310",
     "requests>=2.32",
     "tomlkit>=0.13",
-    "urllib3>=2.0",
+    "urllib3>=2.7.0",
 ]
 
 [project.optional-dependencies]
