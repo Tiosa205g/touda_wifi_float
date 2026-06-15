@@ -14,7 +14,7 @@ dependencies = [
     "pysidesix-frameless-window>=0.7",
     "pyotp>=2.9",
     "pywin32>=310",
-    "requests>=2.32",
+    "requests>=2.33.0",
     "tomlkit>=0.13",
     "urllib3>=2.0",
 ]
