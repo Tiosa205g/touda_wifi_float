@@ -299,12 +299,23 @@ class FloatBall(DragWindow):
             menu.addMenu(linkType)
 
     _switch_thread = None
+    _switch_worker = None
 
-    def change_account(self, name, password, index):
+    def change_account(self, name, password, index, *args):
         """
         切换账号：放入后台线程执行，避免阻塞 UI
         """
-        if self._switch_thread is not None and self._switch_thread.isRunning():
+        try:
+            thread_busy = (
+                self._switch_thread is not None
+                and self._switch_thread.isRunning()
+            )
+        except RuntimeError:
+            thread_busy = False
+            self._switch_thread = None
+            self._switch_worker = None
+
+        if thread_busy:
             logger.warning("账号切换正在进行中，忽略重复请求")
             return
 
@@ -317,6 +328,7 @@ class FloatBall(DragWindow):
 
             def on_finished(result):
                 self._switch_thread = None
+                self._switch_worker = None
                 ok = isinstance(result, bool) and result
                 if ok:
                     try:
@@ -328,12 +340,14 @@ class FloatBall(DragWindow):
                     logger.info("切换账号失败")
 
             # 创建后台线程，on_finished 使用 QueuedConnection 确保在主线程执行
-            thread, worker = touda.start_worker_in_thread(do_switch, "account_switch")
+            thread, worker = touda.start_worker_in_thread(do_switch, "切换账号")
             worker.finished.connect(on_finished, QtNS.QueuedConnection)
 
             self._switch_thread = thread
+            self._switch_worker = worker
         except Exception as e:
             self._switch_thread = None
+            self._switch_worker = None
             logger.exception(f"切换账号出错: {e}")
 
 
