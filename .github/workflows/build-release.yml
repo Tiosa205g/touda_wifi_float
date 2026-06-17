@@ -78,6 +78,8 @@ jobs:
             $dest = "dist/plugins/$($_.Name)"
             Copy-Item $_.FullName $dest -Recurse -Force
           }
+          # 清理打包过程中产生的 __pycache__
+          Get-ChildItem dist -Directory -Recurse -Filter __pycache__ | Remove-Item -Recurse -Force
 
       - name: Upload test build artifact (push to branch)
         if: github.ref_type == 'branch'

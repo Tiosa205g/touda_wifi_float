@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v1.4.5-blue)
+![Version](https://img.shields.io/badge/version-v1.4.6-blue)
 ![Python](https://img.shields.io/badge/python-3.12+-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
@@ -437,7 +437,16 @@ A:
 
 ## 📝 更新日志
 
-### v1.4.5（当前版本）
+### v1.4.6（当前版本）
+
+- ✨ 提取插件 SDK（`plugins/plugin_sdk.py`），抽取公共代码，大幅精简各插件体积
+- ✨ 新增 `scripts/gen_nuitka_plugin_deps.py` 脚本，自动生成 Nuitka 插件依赖清单
+- 🔧 优化打开链接的 TWFID 逻辑，改善 WebVPN 链接访问体验
+- 🔧 优化项目代码，重构 config/plugin_manager/touda 等多处模块，修复部分 bug
+- 🔧 优化 CI 工作流：合并 check 与 build 步骤，修复 PowerShell 兼容性及插件目录缺失问题
+- 🐛 修复插件打包依赖缺失问题
+
+### v1.4.5
 
 - 🔧 优化项目代码，修复设置中修改 key 不会立即生效的问题
 - 🐛 修复切换账号有时会闪退的问题
