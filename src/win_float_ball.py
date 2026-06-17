@@ -74,6 +74,7 @@ class FloatBall(DragWindow):
         self.webvpn.twfid_update.connect(
             lambda twfid: self.main_cfg.write("webvpn", "twfid", twfid)
         )
+        self._used_twfid = None  # 记录已使用过的 twfid，用于判断是否首次使用
 
         self.update_timer = Update_timer(self.wifi)
         x, y = self.main_cfg.get("main", "x", 0), self.main_cfg.get(
@@ -265,9 +266,12 @@ class FloatBall(DragWindow):
         w.cancelButton.setText("否")
         if w.exec():
             try:
+                self.webvpn.autoLogin()
                 url = touda.get_vpn_url(link)
-                if self.webvpn.twfid:
+                # 仅在首次使用该 twfid 时带上 twfid 参数，避免重复传递
+                if self.webvpn.twfid and self.webvpn.twfid != self._used_twfid:
                     url = f"https://webvpn.stu.edu.cn/portal/shortcut.html?twfid={self.webvpn.twfid}&url={url}"
+                    self._used_twfid = self.webvpn.twfid
                 webbrowser.open(url)
             except Exception:
                 logger.exception("webvpn打开链接失败")
