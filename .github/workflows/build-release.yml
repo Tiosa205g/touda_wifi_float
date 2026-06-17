@@ -70,7 +70,7 @@ jobs:
       - name: Prepare release artifacts
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path dist -Force
+          New-Item -ItemType Directory -Path dist/plugins -Force
           Copy-Item output/main.exe dist/
           Copy-Item res dist/ -Recurse -Force
           Copy-Item plugins/plugin_sdk.py dist/plugins/
