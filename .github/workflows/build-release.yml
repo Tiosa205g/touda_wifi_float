@@ -51,7 +51,9 @@ jobs:
       - name: Compile with Nuitka
         shell: pwsh
         run: |
-          uv run nuitka '@nuitka_plugin_deps.txt' `
+          $extras = @()
+          Get-Content nuitka_plugin_deps.txt | ForEach-Object { $extras += $_ }
+          uv run nuitka @extras `
             --onefile --standalone `
             --jobs=3 --lto=no `
             --assume-yes-for-downloads `
