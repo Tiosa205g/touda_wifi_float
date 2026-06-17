@@ -6,7 +6,9 @@ from bs4 import BeautifulSoup
 from pathlib import Path
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
-from PySide6.QtWidgets import QWidget,QVBoxLayout
+from PySide6.QtWidgets import QWidget, QVBoxLayout
+
+from plugin_sdk import PluginSDK, PluginMenu
 
 PLUGIN_NAME = '汕大服务号插件'
 PLUGIN_VERSION = '1.0.0'
@@ -16,42 +18,23 @@ PLUGIN_PATH = Path(__file__).parent
 # 使用与主程序一致的标识
 hook = pluggy.HookimplMarker("toudawifi") # 不能变动
 
-class SDK:
-    def __init__(self,api):
-        self.api = api
-    def logger_info(self,msg:str):
-        self.api.logger.info(f'[{PLUGIN_NAME}] {msg}')
-    def logger_error(self,msg:str):
-        self.api.logger.error(f'[{PLUGIN_NAME}] {msg}')
-    def get_sub(self)->dict: #{'username':xxx,'pwd':xxx}
-        return {'username':self.api.wifi.username,'pwd':self.api.wifi.password}
-    def get_current_account(self)->dict:
-        """{'name':xxx,'pwd':xxx} 不一定已经登录，比如到了临时用户时间"""
-        main = self.api.cfg(self.api.MAIN_CFG)
-        current = self.api.cfg(f"{self.api.CFG_DIR}\\account_{main.get('main','current_account',0)}.toml")
-        name = current.get('setting','name','')
-        password = base64.b64decode(current.get('setting','password','').encode('utf-8')).decode('utf-8')
-        return {'name':name,'pwd':password}
-    class Menu: # 插件名 功能名 函数
-        def __init__(self):
-            self.menu = []
-        def add_func(self,func_name:str,func):
-            """功能名，可调用的函数对象"""
-            self.menu.append({'function':func_name,
-                              'object':func})
-            
-        def add_funcs(self,funcs:list[dict]):
-            """list内应为{'function':功能名,'object':可调用函数对象}"""
-            self.menu.extend(funcs)
+class SDK(PluginSDK):
+    """继承公共 PluginSDK，增加插件特有方法"""
 
-        def del_func(self,func_name:str)->bool:
-            """删除指定功能名的功能"""
-            num = len(self.menu)
-            self.menu = [x for x in self.menu if x['function'] != func_name]
-            return len(self.menu) != num
-        
-        def get_all(self)->list[dict]:
-            return self.menu
+    def get_sub(self) -> dict:
+        return {'username': self.api.wifi.name, 'pwd': self.api.wifi.password}
+
+    def get_current_account(self) -> dict:
+        """返回当前配置的账号（{'name':xxx,'pwd':xxx}），不一定已登录"""
+        main = self.api.cfg(self.api.MAIN_CFG)
+        current = self.api.cfg(
+            f"{self.api.CFG_DIR}\\account_{main.get('main','current_account',0)}.toml"
+        )
+        name = current.get('setting', 'name', '')
+        password = base64.b64decode(
+            current.get('setting', 'password', '').encode('utf-8')
+        ).decode('utf-8')
+        return {'name': name, 'pwd': password}
 class Plugin:  # 类名固定为 Plugin，不能变动，否则无法识别
     @hook
     def start(self,api) -> bool:
@@ -80,9 +63,9 @@ class Plugin:  # 类名固定为 Plugin，不能变动，否则无法识别
         except Exception as e:
             self.sdk.logger_error(f'出错啦:{e}')
     @hook
-    def get_menu(self)->list[dict]: # list[功能 - function]
-        """获取插件的菜单信息,需要返回list[{'function':'功能名','object':callable函数}]"""
-        menu = self.sdk.Menu()
+    def get_menu(self)->list[dict]:
+        """获取插件的菜单信息"""
+        menu = PluginMenu()
         acc = self.sdk.get_current_account()
         name = acc['name']
         pwd = acc['pwd']

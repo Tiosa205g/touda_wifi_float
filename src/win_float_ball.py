@@ -3,7 +3,7 @@ import re
 import webbrowser
 import base64
 from functools import partial
-from PySide6.QtCore import QPoint, QTimer, QThread
+from PySide6.QtCore import QPoint, QTimer
 from PySide6.QtGui import Qt
 from PySide6.QtWidgets import QApplication
 from qfluentwidgets import TeachingTip, RoundMenu, Action, Dialog
@@ -17,12 +17,12 @@ path = os.getcwd()
 
 
 class MyRoundMenu(RoundMenu):
-    # 重写方法加入点击打开子菜单
+    # 重写方法：点击有子菜单的项时在右侧展开子菜单
     def _onItemClicked(self, item):
         super()._onItemClicked(item)
         action = item.data(Qt.UserRole)
         if action in self._subMenus and action.isEnabled():
-            pos = self.mapToGlobal(QPoint(self.width() - 25, +30))
+            pos = self.mapToGlobal(QPoint(self.width() - 25, 30))
             action.exec(pos)
 
     def mousePressEvent(self, e):
@@ -300,7 +300,7 @@ class FloatBall(DragWindow):
 
     _switch_thread = None
 
-    def change_account(self, name, password, index, *args):
+    def change_account(self, name, password, index):
         """
         切换账号：放入后台线程执行，避免阻塞 UI
         """
@@ -310,17 +310,10 @@ class FloatBall(DragWindow):
 
         try:
             main = config.CfgParse(path + "/config/main.toml")
+            from PySide6.QtCore import Qt as QtNS
 
             def do_switch():
                 return self.wifi.change_account(name, password)
-
-            from PySide6.QtCore import Qt as QtNS
-
-            thread = QThread(self)
-            thread.setObjectName("account_switch")
-            worker = touda.Worker(do_switch)
-            worker.moveToThread(thread)
-            thread.started.connect(worker.run_task)
 
             def on_finished(result):
                 self._switch_thread = None
@@ -334,13 +327,11 @@ class FloatBall(DragWindow):
                 else:
                     logger.info("切换账号失败")
 
+            # 创建后台线程，on_finished 使用 QueuedConnection 确保在主线程执行
+            thread, worker = touda.start_worker_in_thread(do_switch, "account_switch")
             worker.finished.connect(on_finished, QtNS.QueuedConnection)
-            worker.finished.connect(worker.deleteLater)
-            worker.finished.connect(thread.quit)
-            thread.finished.connect(thread.deleteLater)
 
             self._switch_thread = thread
-            thread.start()
         except Exception as e:
             self._switch_thread = None
             logger.exception(f"切换账号出错: {e}")

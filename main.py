@@ -38,31 +38,12 @@ def init_config():
 if __name__ == "__main__":
     argv = sys.argv
     logger.info(f"argv: {argv}")
-    # if len(argv) == 2:
-    #     if argv[1] == "setting":
-    #         # 如果是打包的exe且需要控制台，动态创建控制台
-    #         if getattr(sys, 'frozen', False):  # 检查是否为打包的exe
-    #             import ctypes
-    #             ctypes.windll.kernel32.AllocConsole()
-    #             # 重定向标准输入输出到控制台
-    #             try:
-    #                 sys.stdout = open('CONOUT$', 'w')
-    #                 sys.stderr = open('CONOUT$', 'w')
-    #                 sys.stdin = open('CONIN$', 'r')
-    #             except Exception as e:
-    #                 sys.exit("重定向失败退出")
-    #         while True:
-    #             try:
-    #                 init.main()
-    #             except Exception as e:
-    #                 logger.exception(f'发生错误：{e}')
 
     init_config()
 
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
-    from src.touda import Worker
-    from PySide6.QtCore import QThread
+    from src.touda import start_worker_in_thread
     from src import win_float_ball
     from src.plugin_manager import Manager
     from src.tray import Tray
@@ -91,9 +72,6 @@ if __name__ == "__main__":
         app=app, parent=win
     )
 
-    # first_plg = win.pm.plugins[0]
-    # logger.info(win.pm.is_valid_func(first_plg['object'],'on_exit'))
-
     win.wifi.state_update.connect(win.tray.profile.onUpdateState)
     win.wifi.state_update.connect(
         lambda state: logger.info(f"校园网状态更新：{state}")
@@ -104,24 +82,7 @@ if __name__ == "__main__":
         )
     )
 
-    # 为每个耗时任务创建独立的 QThread，避免把多个任务放到同一个线程导致串行和难以管理
-    def start_worker_in_thread(callable_func, name_prefix):
-        thread = QThread()
-        thread.setObjectName(name_prefix + "_thread")
-        worker = Worker(callable_func)
-        worker.moveToThread(thread)
-        # 当线程启动时运行任务
-        thread.started.connect(worker.run_task)
-        # 打印/处理完成结果
-        worker.finished.connect(lambda x, n=name_prefix: logger.info(f"{n}：{x}"))
-        # 任务结束后清理 worker 和退出线程
-        worker.finished.connect(worker.deleteLater)
-        worker.finished.connect(thread.quit)
-        # 线程退出后删除线程对象
-        thread.finished.connect(thread.deleteLater)
-        thread.start()
-        return thread, worker
-
+    # 后台执行校园网登录和 WebVPN 登录，不阻塞 UI
     wifi_thread, wifi_worker = start_worker_in_thread(
         win.wifi.login, "校园网登录"
     )

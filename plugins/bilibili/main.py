@@ -4,6 +4,8 @@ import re
 import requests
 from pathlib import Path
 
+from plugin_sdk import PluginSDK, PluginMenu
+
 PLUGIN_NAME = 'B站直播解析'
 PLUGIN_VERSION = '1.0.0'
 PLUGIN_AUTHOR = 'tiosa'
@@ -20,35 +22,11 @@ def _extract_text(text, start_marker, end_marker):
     return match.group(1).strip() if match else None
 
 
-class SDK:
-    def __init__(self, api):
-        self.api = api
-
-    def logger_info(self, msg: str):
-        self.api.logger.info(f'[{PLUGIN_NAME}] {msg}')
-
-    def logger_error(self, msg: str):
-        self.api.logger.error(f'[{PLUGIN_NAME}] {msg}')
-
-    class Menu:
-        def __init__(self):
-            self.menu = []
-
-        def add_func(self, func_name: str, func):
-            self.menu.append({'function': func_name, 'object': func})
-
-        def add_funcs(self, funcs: list[dict]):
-            self.menu.extend(funcs)
-
-        def get_all(self) -> list[dict]:
-            return self.menu
-
-
 class Plugin:
     @hook
     def start(self, api) -> bool:
         self.api = api
-        self.sdk = SDK(self.api)
+        self.sdk = PluginSDK(api, PLUGIN_NAME)
         self.session = requests.Session()
         self.session.trust_env = True
         self.session.verify = False
@@ -64,9 +42,8 @@ class Plugin:
 
     @hook
     def get_menu(self) -> list[dict]:
-        menu = self.sdk.Menu()
+        menu = PluginMenu()
         menu.add_func('解析B站直播', self.parse_bilibili)
-        # menu.add_func('当前TWFID', self.show_twfid)
         return menu.get_all()
 
     def _get_live_urls(self, bili_url: str) -> list:

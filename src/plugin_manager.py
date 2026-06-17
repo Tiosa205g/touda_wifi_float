@@ -1,5 +1,6 @@
 import pluggy
 import os
+import sys
 import importlib.util
 from .config import CfgParse
 from .logging_config import logger
@@ -48,6 +49,11 @@ def load_all_plugins(plugin_root: str, pm: pluggy.PluginManager):
     :param plugin_root: 插件根目录（如 ./plugins）
     :param pm: Pluggy 插件管理器
     """
+    # 将插件根目录加入 sys.path，方便插件间共享模块（如 plugin_sdk）
+    abs_root = os.path.abspath(plugin_root)
+    if abs_root not in sys.path:
+        sys.path.insert(0, abs_root)
+
     # 递归遍历所有子目录
     for root, dirs, files in os.walk(plugin_root):
         # 只处理包含 main.py 的子目录
@@ -87,10 +93,21 @@ class Manager:
         # 加载 plugins 目录下所有子目录中的 main.py 插件
         load_all_plugins(plugin_root="./plugins", pm=self.pm)
 
-        # 套娃获取可用插件列表，无效自动卸载
-        self.plugins = [x for x in [{'name':plg.get_name(),'description':plg.get_description(),'object':plg} if plg.start(self.api) else plg.on_disable() and self.pm.unregister(plg) for plg in self.pm.get_plugins()] if x is not None] # 插件字典列表
-        logger.info(f'已加载的有效插件列表:{self.plugins}') 
-    def open_plg_setting(plg):
+        # 逐一启动插件，启动失败则卸载并从列表移除
+        self.plugins = []
+        for plg in self.pm.get_plugins():
+            if plg.start(self.api):
+                self.plugins.append({
+                    'name': plg.get_name(),
+                    'description': plg.get_description(),
+                    'object': plg,
+                })
+            else:
+                # start 返回 False → 卸载以防止残留注册
+                plg.on_disable()
+                self.pm.unregister(plg)
+        logger.info(f'已加载的有效插件列表:{self.plugins}')
+    def open_plg_setting(self, plg):
         plg.on_setting()
     def is_valid_func(self,plg,func_name:str)->bool:
         return callable(getattr(plg,func_name,None))

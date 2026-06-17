@@ -29,13 +29,13 @@ class ProfileCard(QWidget):
         self.nameLabel = BodyLabel(text=name)
         self.emailLabel = CaptionLabel(text=email)
         self.versionLabel = CaptionLabel(text=version)
-        self.fluxLable = CaptionLabel(text="0.00Mb/0.00Mb")
+        self.fluxLabel = CaptionLabel(text="0.00Mb/0.00Mb")
 
         self.righttopLayout.addWidget(self.nameLabel)
         self.righttopLayout.addWidget(self.versionLabel)
         self.rightLayout.addLayout(self.righttopLayout)
         self.rightLayout.addWidget(self.emailLabel)
-        self.rightLayout.addWidget(self.fluxLable)
+        self.rightLayout.addWidget(self.fluxLabel)
 
         font = self.versionLabel.font()
         font.setItalic(True)
@@ -59,4 +59,4 @@ class ProfileCard(QWidget):
             self.emailLabel.setText("<UNK>@stu.edu.cn")
         else:
             self.emailLabel.setText(state.name+"@stu.edu.cn")
-        self.fluxLable.setText(f"{state.used:.2f}Mb/{state.total:.2f}Mb")
+        self.fluxLabel.setText(f"{state.used:.2f}Mb/{state.total:.2f}Mb")

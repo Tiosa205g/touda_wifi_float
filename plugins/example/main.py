@@ -2,6 +2,8 @@
 import pluggy
 from pathlib import Path
 
+from plugin_sdk import PluginSDK, PluginMenu
+
 PLUGIN_NAME = 'example插件'
 PLUGIN_VERSION = '1.0.0'
 PLUGIN_AUTHOR = 'tiosa'
@@ -10,40 +12,12 @@ PLUGIN_PATH = Path(__file__).parent
 # 使用与主程序一致的标识
 hook = pluggy.HookimplMarker("toudawifi") # 不能变动
 
-class SDK:
-    def __init__(self,api):
-        self.api = api
-    def logger_info(self,msg:str):
-        self.api.logger.info(f'[{PLUGIN_NAME}] {msg}')
-    def logger_error(self,msg:str):
-        self.api.logger.error(f'[{PLUGIN_NAME}] {msg}')
-    
-    class Menu: # 插件名 功能名 函数
-        def __init__(self):
-            self.menu = []
-        def add_func(self,func_name:str,func):
-            """功能名，可调用的函数对象"""
-            self.menu.append({'function':func_name,
-                              'object':func})
-            
-        def add_funcs(self,funcs:list[dict]):
-            """list内应为{'function':功能名,'object':可调用函数对象}"""
-            self.menu.extend(funcs)
-
-        def del_func(self,func_name:str)->bool:
-            """删除指定功能名的功能"""
-            num = len(num)
-            self.menu = [x for x in self.menu if x['function'] != func_name] 
-            return len(self.menu) != num
-        
-        def get_all(self)->list[dict]:
-            return self.menu
 class Plugin:  # 类名固定为 Plugin，不能变动，否则无法识别
     @hook
     def start(self,api) -> bool:
         """插件加载时执行，传api包含已实例化的wifi和webvpn类"""
         self.api = api
-        self.sdk = SDK(self.api)
+        self.sdk = PluginSDK(api, PLUGIN_NAME)
         self.sdk.logger_info(f'当前wifi用户名：{self.api.wifi.name}')
         return True # 返回true才会视为有效插件
     @hook
@@ -64,7 +38,7 @@ class Plugin:  # 类名固定为 Plugin，不能变动，否则无法识别
     @hook
     def get_menu(self)->list[dict]: # list[功能 - function]
         """获取插件的菜单信息,需要返回list[{'function':'功能名','object':callable函数}]"""
-        menu = self.sdk.Menu()
+        menu = PluginMenu()
         menu.add_func('测试功能',self.hello_world)
         return menu.get_all()
     

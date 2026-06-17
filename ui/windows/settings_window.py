@@ -1,3 +1,4 @@
+import ast
 import os
 import base64
 from typing import Dict, List
@@ -41,7 +42,8 @@ def ensure_cfg():
     for p in (MAIN_CFG, LINKS_CFG):
         if not os.path.exists(p):
             try:
-                open(p, 'a', encoding='utf-8').close()
+                with open(p, 'a', encoding='utf-8'):
+                    pass
             except Exception:
                 pass
 
@@ -642,9 +644,10 @@ class LinksInterface(_BaseInterface):
         b64 = QApplication.clipboard().text().strip()
         try:
             text = base64.b64decode(b64.encode('utf-8')).decode('utf-8')
-            obj = eval(text)
+            # 使用 ast.literal_eval 替代 eval，避免执行任意代码的安全风险
+            obj = ast.literal_eval(text)
             if not isinstance(obj, dict):
-                raise ValueError('内容不是字典')
+                raise ValueError('内容不是 dict 类型')
         except Exception as e:
             InfoBar.error(title='导入失败', content=str(e), duration=2000, parent=self)
             return

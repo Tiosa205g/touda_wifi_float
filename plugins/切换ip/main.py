@@ -10,6 +10,8 @@ import sys
 import tomlkit
 from pathlib import Path
 
+from plugin_sdk import PluginSDK, PluginMenu
+
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QTextEdit, QMessageBox, QFormLayout,
@@ -333,35 +335,8 @@ def _set_preferred_adapter_name(name: str):
 
 
 # ---------------------------------------------------------------------------
-# SDK
+# SDK  — 使用公共 PluginSDK（src.plugin_sdk）
 # ---------------------------------------------------------------------------
-class SDK:
-    def __init__(self, api):
-        self.api = api
-
-    def logger_info(self, msg: str):
-        self.api.logger.info(f'[{PLUGIN_NAME}] {msg}')
-
-    def logger_error(self, msg: str):
-        self.api.logger.error(f'[{PLUGIN_NAME}] {msg}')
-
-    class Menu:
-        def __init__(self):
-            self.menu = []
-
-        def add_func(self, func_name: str, func):
-            self.menu.append({'function': func_name, 'object': func})
-
-        def add_funcs(self, funcs: list[dict]):
-            self.menu.extend(funcs)
-
-        def del_func(self, func_name: str) -> bool:
-            n = len(self.menu)
-            self.menu = [x for x in self.menu if x['function'] != func_name]
-            return len(self.menu) != n
-
-        def get_all(self) -> list[dict]:
-            return self.menu
 
 
 # ---------------------------------------------------------------------------
@@ -824,7 +799,7 @@ class Plugin:
     @hook
     def start(self, api) -> bool:
         self.api = api
-        self.sdk = SDK(self.api)
+        self.sdk = PluginSDK(api, PLUGIN_NAME)
         self.sdk.logger_info('插件已加载')
         return True
 
@@ -847,7 +822,7 @@ class Plugin:
 
     @hook
     def get_menu(self) -> list[dict]:
-        menu = self.sdk.Menu()
+        menu = PluginMenu()
         menu.add_funcs([
             {'function': '📋 查看网络信息', 'object': self.show_network_info},
             {'function': '⬆ 向前扫描可用IP', 'object': self.scan_down},

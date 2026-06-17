@@ -17,8 +17,8 @@ from src.logging_config import logger
 
 
 class Worker(QObject):
-    finished = Signal(Any)  # 任务完成信号
-    started = Signal()  # 进度更新信号
+    finished = Signal(object)  # 任务完成信号，携带返回值或异常对象
+    started = Signal()  # 任务开始信号
 
     def __init__(self, run, run_on_finish=None, run_on_start=None):
         super().__init__()
@@ -30,14 +30,9 @@ class Worker(QObject):
         self.started.emit()
         if self.run_on_start is not None:
             self.run_on_start()
-        # 捕获运行时异常，避免子线程抛出未捕获异常导致程序意外退出
         try:
             ret = self.run()
         except Exception as e:
-            # 在子线程中记录异常并将异常对象作为结果发出，
-            # 主线程收到后可决定如何处理（记录/忽略/提示）
-            from src.logging_config import logger
-
             logger.exception(f"Worker task 异常: {e}")
             ret = e
 
@@ -45,13 +40,40 @@ class Worker(QObject):
             if self.run_on_finish is not None:
                 self.run_on_finish()
         except Exception:
-            # 确保 run_on_finish 的异常不会阻止 finished 信号发射
-            from src.logging_config import logger
-
             logger.exception("Worker run_on_finish 异常")
 
-        # 无论是否发生异常，都发射 finished 信号
         self.finished.emit(ret)
+
+
+from PySide6.QtCore import QThread
+
+
+def start_worker_in_thread(callable_func, name_prefix="task", on_finished=None):
+    """创建并启动后台线程执行 callable_func，自动管理线程/Worker 生命周期。
+
+    Args:
+        callable_func: 在线程中执行的函数
+        name_prefix: 线程命名前缀（用于调试）
+        on_finished: 可选回调，接收 callable_func 的返回值，在 cleanup 前执行
+
+    Returns:
+        (thread, worker): 可供调用方按需连接更多信号
+    """
+    thread = QThread()
+    thread.setObjectName(name_prefix + "_thread")
+    worker = Worker(callable_func)
+    worker.moveToThread(thread)
+    thread.started.connect(worker.run_task)
+
+    if on_finished:
+        worker.finished.connect(on_finished)
+
+    worker.finished.connect(lambda x: logger.info(f"{name_prefix}: {x}"))
+    worker.finished.connect(worker.deleteLater)
+    worker.finished.connect(thread.quit)
+    thread.finished.connect(thread.deleteLater)
+    thread.start()
+    return thread, worker
 
 
 class encrypt:
@@ -94,20 +116,24 @@ class encrypt:
         else:
             return "000000"
 
+    # 解码后的 JS 加密脚本缓存（避免每次 getpwds 都重复 Base64 解码）
+    _decoded_js = None
+
+    @classmethod
+    def _get_decoded_js(cls) -> str:
+        if cls._decoded_js is None:
+            cls._decoded_js = base64.b64decode(cls.js_code).decode("utf-8")
+        return cls._decoded_js
+
     def getpwds(self, pwd: str, rand: str, r: str) -> str:
         """
         利用页面中原有js基础上，添加Function，实现对密码原文进行rsa加密，获取登录需要的svpn_pwd
 
         pwd 密码明文
-
         rand 请求config页面返回的随机数
         """
         id = "_".join([pwd, rand])  # pwd_rand
-        js = (
-            base64.b64decode(self.js_code)
-            .decode("utf-8")
-            .replace("###this###is###r###", r)
-        )
+        js = self._get_decoded_js().replace("###this###is###r###", r)
         ctx = MiniRacer()
         ctx.eval(js)
         result = ctx.call("getkey", id)
