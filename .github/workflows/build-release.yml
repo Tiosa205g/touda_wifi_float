@@ -62,9 +62,16 @@ jobs:
       - name: Setup MSVC compiler environment
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Auto-detect plugin dependencies
+        shell: pwsh
+        run: |
+          uv run python scripts/gen_nuitka_plugin_deps.py > nuitka_plugin_deps.txt
+          Get-Content nuitka_plugin_deps.txt
+
       - name: Compile with Nuitka
         run: |
-          uv run nuitka --onefile --standalone `
+          uv run nuitka @nuitka_plugin_deps.txt `
+            --onefile --standalone `
             --jobs=3 --lto=no `
             --assume-yes-for-downloads `
             --output-dir=output `
@@ -83,41 +90,40 @@ jobs:
           New-Item -ItemType Directory -Path dist -Force
           Copy-Item output/main.exe dist/
           Copy-Item res dist/ -Recurse -Force
+          # 复制插件根目录的 sdk 文件
+          Copy-Item plugins/plugin_sdk.py dist/plugins/
           Get-ChildItem plugins -Directory | Where-Object { $_.Name -ne 'example' } | ForEach-Object {
             $dest = "dist/plugins/$($_.Name)"
             Copy-Item $_.FullName $dest -Recurse -Force
           }
 
-      - name: Create ZIP archive
-        shell: pwsh
-        run: |
-          if ("${{ github.ref_type }}" -eq "tag") {
-            $base = "${{ github.ref_name }}"
-          } elseif ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $base = "manual-${{ github.run_number }}"
-          } else {
-            $base = "test-${{ github.sha }}"
-          }
-          $zipName = "touda-wifi-float-$base.zip"
-          Compress-Archive -Path dist/* -DestinationPath $zipName -Force
-          "ZIP_FILE=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
+      # ── 分支推送 → 上传 untar 目录作为 Artifact（GitHub 帮你打一层 zip，无嵌套） ──
       - name: Upload test build artifact (push to branch)
         if: github.ref_type == 'branch'
         uses: actions/upload-artifact@v4
         with:
           name: touda-wifi-float-test-build
-          path: ${{ env.ZIP_FILE }}
+          path: dist/
+
+      # ── 手动触发 → 同上 ──
+      - name: Upload manual build artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: touda-wifi-float-manual-build
+          path: dist/
+
+      # ── v* 标签 → 打 zip 后上传到 Release ──
+      - name: Create ZIP archive
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $zipName = "touda-wifi-float-${{ github.ref_name }}.zip"
+          Compress-Archive -Path dist/* -DestinationPath $zipName -Force
+          "ZIP_FILE=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Upload to GitHub Release (v* tag)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.ZIP_FILE }}
-
-      - name: Upload manual build artifact
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: touda-wifi-float-manual-build
-          path: ${{ env.ZIP_FILE }}
