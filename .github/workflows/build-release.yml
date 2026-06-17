@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 jobs:
-  check:
+  build:
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -39,26 +39,6 @@ jobs:
       - name: Python syntax check
         run: uv run python -m compileall . -q -x '\.venv|__pycache__|output'
 
-  build:
-    needs: check
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.ref || github.ref }}
-
-      - name: Setup Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Setup UV
-        uses: astral-sh/setup-uv@v5
-
-      - name: Install dependencies
-        run: uv sync --extra dev
-
       - name: Setup MSVC compiler environment
         uses: ilammy/msvc-dev-cmd@v1
 
@@ -69,8 +49,9 @@ jobs:
           Get-Content nuitka_plugin_deps.txt
 
       - name: Compile with Nuitka
+        shell: pwsh
         run: |
-          uv run nuitka @nuitka_plugin_deps.txt `
+          uv run nuitka '@nuitka_plugin_deps.txt' `
             --onefile --standalone `
             --jobs=3 --lto=no `
             --assume-yes-for-downloads `
@@ -90,14 +71,12 @@ jobs:
           New-Item -ItemType Directory -Path dist -Force
           Copy-Item output/main.exe dist/
           Copy-Item res dist/ -Recurse -Force
-          # 复制插件根目录的 sdk 文件
           Copy-Item plugins/plugin_sdk.py dist/plugins/
           Get-ChildItem plugins -Directory | Where-Object { $_.Name -ne 'example' } | ForEach-Object {
             $dest = "dist/plugins/$($_.Name)"
             Copy-Item $_.FullName $dest -Recurse -Force
           }
 
-      # ── 分支推送 → 上传 untar 目录作为 Artifact（GitHub 帮你打一层 zip，无嵌套） ──
       - name: Upload test build artifact (push to branch)
         if: github.ref_type == 'branch'
         uses: actions/upload-artifact@v4
@@ -105,7 +84,6 @@ jobs:
           name: touda-wifi-float-test-build
           path: dist/
 
-      # ── 手动触发 → 同上 ──
       - name: Upload manual build artifact
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
@@ -113,7 +91,6 @@ jobs:
           name: touda-wifi-float-manual-build
           path: dist/
 
-      # ── v* 标签 → 打 zip 后上传到 Release ──
       - name: Create ZIP archive
         if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
