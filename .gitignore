@@ -9,3 +9,4 @@ config.toml
 *.exe
 .vscode/
 .omo/
+AGENTS.md

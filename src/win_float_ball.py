@@ -77,6 +77,7 @@ class FloatBall(DragWindow):
         self._used_twfid = None  # 记录已使用过的 twfid，用于判断是否首次使用
 
         self.update_timer = Update_timer(self.wifi)
+        self._cached_menu = None  # 右键菜单缓存（首次打开时构建，后续复用）
         x, y = self.main_cfg.get("main", "x", 0), self.main_cfg.get(
             "main", "y", 0
         )  # 设置初始位置为上一次关闭位置
@@ -94,8 +95,25 @@ class FloatBall(DragWindow):
             parent=self.ui.waterBall,
         )
 
+    def hideEvent(self, event):
+        """窗口隐藏时暂停波浪动画，减少 GPU/CPU 占用（定时器保持运行，保证网络认证状态）"""
+        self.ui.waterBall.wave_animation.pause()
+        super().hideEvent(event)
+
+    def showEvent(self, event):
+        """窗口显示时恢复波浪动画"""
+        self.ui.waterBall.wave_animation.resume()
+        super().showEvent(event)
+
     def waterBall_menu(self, pos):
-        self.mainMenu = MyRoundMenu()
+        """右键菜单：菜单对象缓存复用，每次打开不再新建，彻底解决内存增长"""
+        if self._cached_menu is None:
+            self._cached_menu = self._build_menu()
+        self._cached_menu.exec(self.mapToGlobal(pos))
+
+    def _build_menu(self):
+        """一次性构建右键菜单（仅在首次右键时调用）"""
+        menu = MyRoundMenu()
         accountMenu = MyRoundMenu("账号")
         linkMenu = MyRoundMenu("链接")
         webvpnMenu = MyRoundMenu("webvpn相关")
@@ -148,9 +166,9 @@ class FloatBall(DragWindow):
             ]
         )
 
-        self.mainMenu.addMenu(linkMenu)
-        self.mainMenu.addMenu(webvpnMenu)
-        self.mainMenu.addMenu(accountMenu)
+        menu.addMenu(linkMenu)
+        menu.addMenu(webvpnMenu)
+        menu.addMenu(accountMenu)
 
         try:
             if len(self.pm.plugins) > 0:
@@ -161,26 +179,25 @@ class FloatBall(DragWindow):
                             Action(text=a["function"], triggered=a["object"])
                             for a in p.get_menu()
                         ]
-                        menu = MyRoundMenu(plg["name"])
-                        menu.addActions(plg_actions)
-                        pluginMenu.addMenu(menu)
-                self.mainMenu.addMenu(pluginMenu)
+                        sub_menu = MyRoundMenu(plg["name"])
+                        sub_menu.addActions(plg_actions)
+                        pluginMenu.addMenu(sub_menu)
+                menu.addMenu(pluginMenu)
         except Exception:
             logger.exception("加载插件菜单失败")
 
-        self.mainMenu.addSeparator()
-        self.mainMenu.addAction(
+        menu.addSeparator()
+        menu.addAction(
             Action(
                 text="立即更新状态",
                 icon=FIF.SYNC,
                 triggered=self.update_timer.update,
             )
         )
-        self.mainMenu.addAction(
+        menu.addAction(
             Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True))
         )
-
-        self.mainMenu.exec(self.mapToGlobal(pos))
+        return menu
 
     def clipboard_convert_webvpn(self):
         count = 0

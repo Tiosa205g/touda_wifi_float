@@ -48,7 +48,8 @@ class WaterBall(QWidget):
 
     def set_wave_offset(self, value):
         self._wave_offset = value
-        self.update()
+        if self.isVisible():
+            self.update()
 
     wave_offset = Property(float, get_wave_offset, set_wave_offset)
 
