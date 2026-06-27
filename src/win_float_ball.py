@@ -120,24 +120,24 @@ class FloatBall(DragWindow):
         pluginMenu = MyRoundMenu("插件")
 
         try:
-            i = 0
-            for file in os.listdir("config"):
-                if "account_" in file and ".toml" in file:
+            for file in sorted(os.listdir("config")):
+                match = re.match(r"account_(\d+)\.toml", file)
+                if match:
                     now = config.CfgParse("config/" + file)
                     name = now.get("setting", "name")
                     password = base64.b64decode(
                         now.get("setting", "password", "").encode("utf-8")
                     ).decode("utf-8")
                     if name and password:
+                        index = int(match.group(1))
                         accountMenu.addAction(
                             Action(
                                 text="切换为" + name,
                                 icon=FIF.CHAT,
-                                triggered=partial(self.change_account, name, password, i),
+                                triggered=partial(self.change_account, name, password, index),
                             )
                         )
-                        i += 1
-            logger.info(f"已加载{i}个账号")
+            logger.info("账号菜单加载完成")
         except Exception:
             logger.exception("加载账号菜单失败")
 
@@ -340,6 +340,12 @@ class FloatBall(DragWindow):
             main = config.CfgParse(path + "/config/main.toml")
             from PySide6.QtCore import Qt as QtNS
 
+            # 先保存当前账号索引，确保重启后使用新账号（无论登录是否成功）
+            try:
+                main.write("main", "current_account", index)
+            except Exception:
+                pass
+
             def do_switch():
                 return self.wifi.change_account(name, password)
 
@@ -348,13 +354,9 @@ class FloatBall(DragWindow):
                 self._switch_worker = None
                 ok = isinstance(result, bool) and result
                 if ok:
-                    try:
-                        main.write("main", "current_account", index)
-                    except Exception:
-                        pass
                     logger.info("切换账号成功")
                 else:
-                    logger.info("切换账号失败")
+                    logger.info("切换账号失败，但账号配置已保存，重启后将使用新账号")
 
             # 创建后台线程，on_finished 使用 QueuedConnection 确保在主线程执行
             thread, worker = touda.start_worker_in_thread(do_switch, "切换账号")
