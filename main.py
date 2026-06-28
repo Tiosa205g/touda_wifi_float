@@ -1,12 +1,13 @@
 import sys
 import os
+import gc
 from pathlib import Path
 
 # import init
 from src.logging_config import logger
 from src.config import CfgParse
 
-VERSION = "v1.4.6"
+VERSION = "v1.4.7"
 CONFIG_DIR = os.path.join(os.getcwd(), "config")
 MAIN_CFG = os.path.join(CONFIG_DIR, "main.toml")
 LINKS_CFG = os.path.join(CONFIG_DIR, "links.toml")
@@ -41,7 +42,8 @@ if __name__ == "__main__":
 
     init_config()
 
-    from PySide6.QtGui import QIcon
+    from PySide6.QtGui import QIcon, QPixmapCache
+    from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication
     from src.touda import start_worker_in_thread
     from src import win_float_ball
@@ -66,6 +68,14 @@ if __name__ == "__main__":
         pass
     win = win_float_ball.FloatBall(app.primaryScreen().size(), app)
     win.setWindowIcon(QIcon("res/ico/favicon.ico"))
+    # 限制 QPixmapCache 大小（默认 10MB → 5MB），减少 bitmap 缓存占用
+    QPixmapCache.setCacheLimit(5120)
+
+    # 定时从主线程回收 Python GC，避免跨线程删除 QObject
+    gc_timer = QTimer(win)
+    gc_timer.timeout.connect(gc.collect)
+    gc_timer.start(60000)  # 每 60 秒回收一次
+
     win.tray = Tray(win, VERSION)
     win.pm = Manager(
         win.wifi, win.webvpn, VERSION, CONFIG_DIR, MAIN_CFG, LINKS_CFG,

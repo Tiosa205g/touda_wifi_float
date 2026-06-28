@@ -1,6 +1,6 @@
 [project]
 name = "touda-wifi-float"
-version = "1.4.6"
+version = "1.4.7"
 description = "汕大wifi、webvpn登录工具，自定义个性化插件，内置汕大服务号插件"
 readme = "README.md"
 requires-python = ">=3.12"

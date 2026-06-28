@@ -107,6 +107,16 @@ class Manager:
                 plg.on_disable()
                 self.pm.unregister(plg)
         logger.info(f'已加载的有效插件列表:{self.plugins}')
+    def shutdown(self):
+        """程序退出时调用所有插件的 on_exit 钩子，释放插件持有的资源"""
+        for plg in self.plugins:
+            obj = plg["object"]
+            if callable(getattr(obj, "on_exit", None)):
+                try:
+                    obj.on_exit()
+                except Exception:
+                    logger.exception(f"插件 {plg.get('name', '?')} on_exit 异常")
+
     def open_plg_setting(self, plg):
         plg.on_setting()
     def is_valid_func(self,plg,func_name:str)->bool:

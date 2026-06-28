@@ -3,7 +3,7 @@ import re
 import webbrowser
 import base64
 from functools import partial
-from PySide6.QtCore import QPoint, QTimer
+from PySide6.QtCore import QPoint, QTimer, QPropertyAnimation
 from PySide6.QtGui import Qt
 from PySide6.QtWidgets import QApplication
 from qfluentwidgets import TeachingTip, RoundMenu, Action, Dialog
@@ -76,7 +76,7 @@ class FloatBall(DragWindow):
         )
         self._used_twfid = None  # 记录已使用过的 twfid，用于判断是否首次使用
 
-        self.update_timer = Update_timer(self.wifi)
+        self.update_timer = Update_timer(self.wifi, parent=self)
         self._cached_menu = None  # 右键菜单缓存（首次打开时构建，后续复用）
         x, y = self.main_cfg.get("main", "x", 0), self.main_cfg.get(
             "main", "y", 0
@@ -97,12 +97,14 @@ class FloatBall(DragWindow):
 
     def hideEvent(self, event):
         """窗口隐藏时暂停波浪动画，减少 GPU/CPU 占用（定时器保持运行，保证网络认证状态）"""
-        self.ui.waterBall.wave_animation.pause()
+        if self.ui.waterBall.wave_animation.state() == QPropertyAnimation.Running:
+            self.ui.waterBall.wave_animation.pause()
         super().hideEvent(event)
 
     def showEvent(self, event):
         """窗口显示时恢复波浪动画"""
-        self.ui.waterBall.wave_animation.resume()
+        if self.ui.waterBall.wave_animation.state() == QPropertyAnimation.Paused:
+            self.ui.waterBall.wave_animation.resume()
         super().showEvent(event)
 
     def waterBall_menu(self, pos):
@@ -114,10 +116,10 @@ class FloatBall(DragWindow):
     def _build_menu(self):
         """一次性构建右键菜单（仅在首次右键时调用）"""
         menu = MyRoundMenu()
-        accountMenu = MyRoundMenu("账号")
-        linkMenu = MyRoundMenu("链接")
-        webvpnMenu = MyRoundMenu("webvpn相关")
-        pluginMenu = MyRoundMenu("插件")
+        accountMenu = MyRoundMenu("账号", parent=menu)
+        linkMenu = MyRoundMenu("链接", parent=menu)
+        webvpnMenu = MyRoundMenu("webvpn相关", parent=menu)
+        pluginMenu = MyRoundMenu("插件", parent=menu)
 
         try:
             for file in sorted(os.listdir("config")):
@@ -179,7 +181,7 @@ class FloatBall(DragWindow):
                             Action(text=a["function"], triggered=a["object"])
                             for a in p.get_menu()
                         ]
-                        sub_menu = MyRoundMenu(plg["name"])
+                        sub_menu = MyRoundMenu(plg["name"], parent=pluginMenu)
                         sub_menu.addActions(plg_actions)
                         pluginMenu.addMenu(sub_menu)
                 menu.addMenu(pluginMenu)
@@ -303,7 +305,7 @@ class FloatBall(DragWindow):
         link_all = config.CfgParse(path + "/config/links.toml").get_all()
 
         for link_type in link_all:
-            linkType = MyRoundMenu(link_type)
+            linkType = MyRoundMenu(link_type, parent=menu)
             for name in link_all[link_type]:
                 link = link_all[link_type][name]
                 linkType.addAction(
@@ -371,8 +373,8 @@ class FloatBall(DragWindow):
 
 
 class Update_timer(QTimer):
-    def __init__(self, wifi):
-        super().__init__()
+    def __init__(self, wifi, parent=None):
+        super().__init__(parent=parent)
         try:
             self.wifi = wifi
             main = config.CfgParse(os.getcwd() + "/config/main.toml")

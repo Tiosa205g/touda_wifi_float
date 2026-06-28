@@ -6,16 +6,25 @@ from tomlkit.exceptions import NonExistentKey
 class CfgParse:
     # 类级缓存：path -> TOMLDocument，同路径实例共享缓存，减少磁盘 I/O
     _cache = {}
+    _MAX_CACHE = 32  # 最多缓存 32 个文件，防止插件/临时路径无限增长
 
     def __init__(self, path: str):
         self.path = path
         self._ensure_cache()
 
     def _ensure_cache(self):
-        """缓存未命中时从磁盘加载"""
+        """缓存未命中时从磁盘加载，超出上限时淘汰最早未使用的缓存"""
         if self.path not in self._cache:
+            # 淘汰机制：超出上限时清空缓存（安全简单，config 文件数量通常 < 10）
+            if len(self._cache) >= self._MAX_CACHE:
+                self._cache.clear()
             with open(self.path, 'r', encoding='utf-8') as f:
                 self._cache[self.path] = tomlkit.load(f)
+
+    @classmethod
+    def clear_cache(cls):
+        """清空所有缓存（在程序退出或测试时调用）"""
+        cls._cache.clear()
 
     def reload(self):
         """强制从磁盘重载并更新缓存"""

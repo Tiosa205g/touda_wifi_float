@@ -1,4 +1,5 @@
 import os
+import weakref
 from PySide6.QtWidgets import QSystemTrayIcon
 from qfluentwidgets import SystemTrayMenu, Action
 from src import config
@@ -12,9 +13,9 @@ class Tray(QSystemTrayIcon):
         self.setIcon(parent.windowIcon())
         self.setToolTip('Touda WiFi')
 
-        self.profile = ProfileCard("res/ico/favicon.ico", "<UNK>", "<UNK>@stu.edu.cn",version)
-
+        # 必须先创建 menu，因为 ProfileCard 需要以 menu 为 parent
         self.menu = SystemTrayMenu("touda_wifi", parent=parent)
+        self.profile = ProfileCard("res/ico/favicon.ico", "<UNK>", "<UNK>@stu.edu.cn",version, parent=self.menu)
         self.menu.addWidget(self.profile,selectable=False)
         self.menu.aboutToShow.connect(self.onMenuShow)
         self.menu.addAction(Action(text='设置', triggered=self.open_settings))
@@ -50,8 +51,12 @@ class Tray(QSystemTrayIcon):
         try:
             self._settings_win = SettingsWindow()
             # 窗口关闭并删除后，自动将引用置空，避免悬空对象
+            # 使用弱引用避免 lambda 强捕获 self 导致引用循环
+            weak_self = weakref.ref(self)
             try:
-                self._settings_win.destroyed.connect(lambda: setattr(self, '_settings_win', None))
+                self._settings_win.destroyed.connect(
+                    lambda win=weak_self: win() is not None and setattr(win(), '_settings_win', None)
+                )
             except Exception:
                 pass
             self._settings_win.show()
@@ -63,6 +68,20 @@ class Tray(QSystemTrayIcon):
         mainc = config.CfgParse(os.getcwd()+"/config/main.toml")
         mainc.write('main','x',x)
         mainc.write('main','y',y)
+        # 通知所有插件释放资源
+        if hasattr(self.parent(), 'pm') and self.parent().pm is not None:
+            self.parent().pm.shutdown()
+        # 清理配置文件缓存
+        config.CfgParse.clear_cache()
+        # 关闭网络会话连接池，释放 socket/内存资源
+        try:
+            parent = self.parent()
+            if hasattr(parent, 'wifi') and parent.wifi is not None:
+                parent.wifi.session.close()
+            if hasattr(parent, 'webvpn') and parent.webvpn is not None:
+                parent.webvpn.session.close()
+        except Exception:
+            pass
         logger.info('quit')
         from PySide6.QtCore import QCoreApplication
         QCoreApplication.instance().quit()

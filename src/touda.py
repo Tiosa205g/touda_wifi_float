@@ -118,6 +118,8 @@ class encrypt:
 
     # 解码后的 JS 加密脚本缓存（避免每次 getpwds 都重复 Base64 解码）
     _decoded_js = None
+    # 复用的 MiniRacer 实例（避免每次登录都创建新的 V8 引擎，节省 ~10-20MB）
+    _mr_instance = None
 
     @classmethod
     def _get_decoded_js(cls) -> str:
@@ -134,9 +136,11 @@ class encrypt:
         """
         id = "_".join([pwd, rand])  # pwd_rand
         js = self._get_decoded_js().replace("###this###is###r###", r)
-        ctx = MiniRacer()
-        ctx.eval(js)
-        result = ctx.call("getkey", id)
+        # 复用 MiniRacer 实例，避免每次创建新的 V8 引擎（~10-20MB/个）
+        if encrypt._mr_instance is None:
+            encrypt._mr_instance = MiniRacer()
+        encrypt._mr_instance.eval(js)
+        result = encrypt._mr_instance.call("getkey", id)
         return result
 
 
