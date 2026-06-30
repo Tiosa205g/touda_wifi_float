@@ -3,17 +3,22 @@ import sys
 import os
 from datetime import datetime
 
+def _is_source():
+    """检测是否为源码运行（而非打包 exe）"""
+    return sys.argv[0].endswith('.py')
+
+
 def get_main_program_directory():
     """获取主程序入口文件所在的目录"""
-    if getattr(sys, 'frozen', False):
-        # 打包后的环境
-        main_path = sys.executable
-    else:
-        # Python环境
+    if _is_source():
+        # Python 环境
         main_path = sys.argv[0]
         if not os.path.isabs(main_path):
             main_path = os.path.abspath(main_path)
-    
+    else:
+        # 打包后的环境
+        main_path = sys.executable
+
     return os.path.dirname(main_path)
 
 # Configure logging on import

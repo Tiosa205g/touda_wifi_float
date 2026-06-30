@@ -284,16 +284,21 @@ class GeneralInterface(_BaseInterface):
             return False
 
     @staticmethod
+    def _is_source() -> bool:
+        """检测是否为源码运行（而非打包 exe）"""
+        return sys.argv[0].endswith('.py')
+
+    @staticmethod
     def _get_app_exe_path() -> str:
         """获取可执行文件路径（兼容 exe 和 .py 运行模式）"""
-        if getattr(sys, 'frozen', False):
-            # Nuitka 打包的 exe
+        if SettingsWindow._is_source():
+            # 源码运行：python.exe + main.py 全路径
+            main_py = os.path.join(os.getcwd(), 'main.py')
+            if os.path.exists(main_py):
+                return f'"{sys.executable}" "{main_py}"'
+            # fallback
             return sys.executable
-        # 源码运行：python.exe + main.py 全路径
-        main_py = os.path.join(os.getcwd(), 'main.py')
-        if os.path.exists(main_py):
-            return f'"{sys.executable}" "{main_py}"'
-        # fallback
+        # Nuitka 打包的 exe
         return sys.executable
 
     def toggleAutoStart(self, checked: bool):
@@ -322,7 +327,7 @@ class GeneralInterface(_BaseInterface):
 
     def toggleAdmin(self, checked: bool):
         """开关管理员启动（写入配置，启动时自动提权）"""
-        if not getattr(sys, 'frozen', False) and checked:
+        if self._is_source() and checked:
             # 源码运行：提示不支持，回退开关
             InfoBar.warning(title='提示', content='源码运行无需管理员权限，打包为 exe 后生效', duration=3000, parent=self)
             self.switchAdmin.blockSignals(True)

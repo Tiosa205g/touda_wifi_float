@@ -4,14 +4,19 @@ import gc
 from pathlib import Path
 
 
+def _is_source():
+    """检测是否为源码运行（而非打包 exe）"""
+    return sys.argv[0].endswith('.py')
+
+
 def _fix_working_dir():
     """将工作目录切换到程序所在目录，确保 os.getcwd() 始终指向正确位置"""
-    if getattr(sys, 'frozen', False):
-        # Nuitka 打包的 exe
-        exe_dir = os.path.dirname(sys.executable)
-    else:
+    if _is_source():
         # 源码运行：main.py 所在目录
         exe_dir = os.path.dirname(os.path.abspath(__file__))
+    else:
+        # Nuitka 打包的 exe
+        exe_dir = os.path.dirname(sys.executable)
     os.chdir(exe_dir)
 
 
@@ -84,7 +89,7 @@ if __name__ == "__main__":
 
     cfg = CfgParse(MAIN_CFG)
     need_admin = str(cfg.get('startup', 'run_as_admin', False)).lower() == 'true'
-    if need_admin and not _is_admin() and not is_auto_start and getattr(sys, 'frozen', False):
+    if need_admin and not _is_admin() and not is_auto_start and not _is_source():
         logger.info("检测到管理员启动配置，正在请求提权…")
         _request_admin_restart()
 
