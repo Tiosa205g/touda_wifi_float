@@ -49,7 +49,6 @@ class FloatBall(DragWindow):
         self.setCanLeftScreen(False, screen_size=screen_size)
         self.ui.waterBall.setContextMenuPolicy(Qt.CustomContextMenu)
         self.ui.waterBall.customContextMenuRequested.connect(self.waterBall_menu)
-        self.ui.waterBall.doubleClicked.connect(self.waterBall_double_click)
 
         # 初始化配置和核心对象
         self.main_cfg = config.CfgParse(path + "/config/main.toml")
@@ -82,18 +81,6 @@ class FloatBall(DragWindow):
             "main", "y", 0
         )  # 设置初始位置为上一次关闭位置
         self.move(x, y)
-
-    def waterBall_double_click(self):
-        # 账号具体信息状态显示
-        TeachingTip.create(
-            self.ui.waterBall,
-            "This is a ball",
-            "这都给你发现了",
-            FIF.BASKETBALL,
-            isClosable=True,
-            duration=1500,
-            parent=self.ui.waterBall,
-        )
 
     def hideEvent(self, event):
         """窗口隐藏时暂停波浪动画，减少 GPU/CPU 占用（定时器保持运行，保证网络认证状态）"""

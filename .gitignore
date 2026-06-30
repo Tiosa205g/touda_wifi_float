@@ -9,5 +9,6 @@ config.toml
 *.exe
 .vscode/
 .omo/
+.omc/
 AGENTS.md
 CLAUDE.md
