@@ -2,9 +2,10 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v1.4.6-blue)
+![Version](https://img.shields.io/badge/version-v1.4.7-blue)
 ![Python](https://img.shields.io/badge/python-3.12+-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
+![Build](https://img.shields.io/github/actions/workflow/status/Tiosa205g/touda_wifi_float/build.yaml?branch=main)
 
 一款为汕头大学校园网设计的桌面悬浮球工具，集成校园网登录、WebVPN 访问、流量监控与插件扩展等功能。
 
@@ -37,6 +38,7 @@
 - **拖拽移动**：支持自由拖拽，位置自动保存
 - **右键菜单**：快捷操作菜单，功能一键可达
 - **主题切换**：支持亮色/暗色/自动主题
+- **启动管理**：支持开机自启、静默启动、管理员启动（设置界面一键配置）
 
 ### 🔗 扩展功能
 
@@ -61,11 +63,11 @@
 ![菜单](/display/右键菜单.png)
 
 > 设置界面
-> ![设置](/display/设置界面.png)
+![设置](/display/设置界面.png)
 
 ## 安装
 
-### 方式一：直接运行（推荐）
+### 方式一：下载预编译版本（推荐）
 
 1. 从 [Releases](https://github.com/Tiosa205g/touda_wifi_float/releases) 下载最新版本的压缩包并解压到合适位置
 2. 双击运行 `main.exe`
@@ -135,6 +137,10 @@ name = ""                       # WebVPN 用户名（学号）
 password = ""                   # WebVPN 密码（Base64 编码存储）
 key = ""                        # 数盾 OTP 秘钥（用于生成 6 位口令）
 twfid = ""                      # WebVPN TWFID（程序成功登录后会自动写入）
+
+[startup]
+run_as_admin = false            # 管理员启动（以管理员权限运行）
+silent = false                  # 静默启动（启动后自动隐藏窗口到托盘）
 ```
 
 #### `account_0.toml` - 账号配置
@@ -159,22 +165,15 @@ mystu = "https://my.stu.edu.cn/"
 
 ### 🔑 配置 WebVPN
 
-1. 运行程序后，找到 `config/main.toml`
-2. 填入你的 WebVPN 信息：
-   - `name`: 你的学号
-   - `password`: 你的密码（使用 Base64 编码）
-   - `key`: 数盾 OTP 密钥（如已绑定）
+推荐通过设置界面图形化配置：
 
-小贴士：出于安全考虑，配置中密码以 Base64 存储，并非加密，仅用于避免明文直观可读。
+1. 右键悬浮球 → **设置** → **WebVPN** 选项卡
+2. 填入用户名（学号）、密码、数盾 OTP 密钥
+3. 点击保存，配置自动写入文件
 
-**Base64 编码密码示例（Python）**：
+如需手动编辑配置文件（`config/main.toml`），字段说明见上方。
 
-```python
-import base64
-password = "your_password"
-encoded = base64.b64encode(password.encode()).decode()
-print(encoded)  # 将此值填入配置文件
-```
+> 小贴士：密码以 Base64 存储，仅为避免明文直观可读，并非加密。
 
 ## 📖 使用说明
 
@@ -193,13 +192,12 @@ print(encoded)  # 将此值填入配置文件
 
 #### 🔗 链接菜单
 
-- 访问预设的校园常用链接
-- 可选择是否通过 WebVPN 访问
+- **剪切板链接**：打开并选择是否走 WebVPN 访问剪贴板中的链接
+- **校园预设链接**：访问预设的校园常用链接（教务系统、mystu等），可选择是否通过 WebVPN
 - 支持 B站直播链接解析
 
 #### 🌐 WebVPN 菜单
 
-- **剪切板链接**：打开剪贴板中的链接
 - **复制一键登录链接**：生成 WebVPN 免密登录链接
 - **转换剪贴板链接**：将剪贴板中的链接批量转换为 WebVPN 格式
 - **复制6位口令**：复制当前的 OTP 动态口令
@@ -285,6 +283,8 @@ class Plugin:  # 类名必须为 Plugin，不可修改
     # 可选钩子：on_setting / on_disable / on_exit
 ```
 
+> 完整依赖列表见 `pyproject.toml`。
+
 ### 可用 API（注入给插件的 api 对象）
 
 - `api.wifi`: 已实例化的校园网对象，支持登录、获取状态等
@@ -331,7 +331,7 @@ touda_wifi_float/
 │   │   └── profile.py      # 配置文件组件
 │   └── windows/            # 窗口组件
 │       ├── drag_window.py      # 拖拽窗口
-│       └── settings_window.py  # 设置窗口
+│       └── settings_window.py  # 设置窗口（含启动/主题/账号管理等）
 ├── plugins/                # 插件目录
 │   ├── example/            # 示例插件
 │   ├── bilibili/           # B站直播解析插件
@@ -345,11 +345,16 @@ touda_wifi_float/
 
 ### 技术栈
 
-- **UI 框架**：PySide6 + pyside6-fluent-widgets + pysidesix-frameless-window
-- **网络请求**：requests + lxml + beautifulsoup4
-- **OTP/加密**：pyotp + mini-racer
-- **包管理**：uv + pyproject.toml
-- **打包工具**：Nuitka（支持 GitHub Actions 自动构建）
+| 类别 | 组件 |
+|------|------|
+| UI 框架 | PySide6 + [PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) |
+| 网络请求 | requests + lxml + beautifulsoup4 |
+| OTP/口令 | pyotp + mini-racer |
+| 配置文件 | tomlkit |
+| 插件系统 | pluggy |
+| Windows API | pywin32 |
+| 包管理 | [uv](https://docs.astral.sh/uv/) |
+| 打包工具 | Nuitka（支持 GitHub Actions 自动构建） |
 
 ### 编译为可执行文件
 
@@ -380,30 +385,13 @@ uv run nuitka --onefile --standalone --mingw64 --output-dir=output --windows-dis
 - UPX 可选，如需启用，请确保本机已安装并在脚本中配置路径或加入 PATH
 - Nuitka 可能需要编译器（MSVC 或 MinGW-w64），按提示安装或让 Nuitka 自动下载
 
-### 依赖包
-
-核心依赖（详见 `pyproject.toml`）：
-
-- `PySide6`: Qt6 Python 绑定
-- `pyside6-fluent-widgets`: Fluent Design UI 组件库
-- `pysidesix-frameless-window`: 无边框窗口支持
-- `requests`: HTTP 请求
-- `pyotp`: OTP 动态口令
-- `lxml` + `beautifulsoup4`: HTML 解析
-- `mini-racer`: JavaScript 执行（无需安装 Node.js）
-- `tomlkit`: TOML 配置文件处理
-- `pluggy`: 插件系统钩子
-- `pywin32`: Windows API 调用
-
 ## 🐛 常见问题
 
-### Q：webvpn的key是什么东西？
+### Q: WebVPN 的 key 是什么？
 
-A：
-
-1. - 如果没有激活webvpn，需要到汕大服务号中激活
-   - 如果已经激活了webvpn，需要到汕大服务号中解绑动态口令
-2. 在webvpn上登录注册，当需要数盾扫码时，切换另一种格式，复制下来就是key，随后可以继续使用数盾扫码输入口令激活
+1. 如果未激活 WebVPN，先到汕大服务号中激活；如果已激活，先解绑动态口令
+2. 在 WebVPN 上登录注册，当需要数盾扫码时，切换"另一种格式"并复制，即为 key
+3. 随后可以继续使用数盾扫码输入口令完成激活
 
 ### Q: 提示"登录失败，密码错误"
 

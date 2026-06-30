@@ -36,11 +36,42 @@ def init_config():
                 Path(f"config/{file}.toml").touch()
 
 
+def _is_admin() -> bool:
+    """检查当前进程是否以管理员权限运行"""
+    try:
+        import ctypes
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except Exception:
+        return False
+
+
+def _request_admin_restart():
+    """以管理员权限重新启动当前程序（不阻塞等待）"""
+    import ctypes
+    args = ' '.join(f'"{a}"' for a in sys.argv[1:])
+    ctypes.windll.shell32.ShellExecuteW(
+        None, "runas", sys.executable, args, None, 1  # SW_SHOWNORMAL
+    )
+    sys.exit(0)
+
+
 if __name__ == "__main__":
     argv = sys.argv
     logger.info(f"argv: {argv}")
 
     init_config()
+
+    # ── 管理员启动检查 ──
+    cfg = CfgParse(MAIN_CFG)
+    need_admin = str(cfg.get('startup', 'run_as_admin', False)).lower() == 'true'
+    if need_admin and not _is_admin():
+        logger.info("检测到管理员启动配置，正在请求提权…")
+        _request_admin_restart()
+
+    # ── 静默启动标志 ──
+    silent_start = str(cfg.get('startup', 'silent', False)).lower() == 'true'
+    if silent_start:
+        logger.info("静默启动模式：窗口启动后自动隐藏到托盘")
 
     from PySide6.QtGui import QIcon, QPixmapCache
     from PySide6.QtCore import QTimer
@@ -101,5 +132,9 @@ if __name__ == "__main__":
     )
 
     win.show()
+
+    if silent_start:
+        # 静默启动：窗口显示后立即隐藏到系统托盘
+        win.setHidden(True)
 
     app.exec()

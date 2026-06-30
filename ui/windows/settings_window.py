@@ -1,5 +1,8 @@
 import ast
 import os
+import sys
+import subprocess
+import winreg
 import base64
 from typing import Dict, List
 
@@ -25,6 +28,7 @@ from qfluentwidgets import (
     Theme,
     isDarkTheme,
     FluentTitleBar,
+    SwitchButton,
 )
 
 from src.config import CfgParse
@@ -180,7 +184,130 @@ class GeneralInterface(_BaseInterface):
         h2.addStretch(1)
         g_account.addWidget(rowTheme)
 
+        # ── 启动管理 ──
+        g_startup = self.addGroup("启动")
+
+        # 开机自启（注册表 HKCU\Run）
+        rowAutoStart = QWidget(self.scrollWidget)
+        h3 = QHBoxLayout(rowAutoStart)
+        h3.setContentsMargins(12, 8, 12, 8)
+        h3.setSpacing(12)
+        self.switchAutoStart = SwitchButton(rowAutoStart)
+        self.switchAutoStart.setOnText("开")
+        self.switchAutoStart.setOffText("关")
+        self.switchAutoStart.checkedChanged.connect(self.toggleAutoStart)
+        h3.addWidget(StrongBodyLabel("开机自启:"))
+        h3.addWidget(self.switchAutoStart)
+        h3.addStretch(1)
+        g_startup.addWidget(rowAutoStart)
+
+        # 管理员启动
+        rowAdmin = QWidget(self.scrollWidget)
+        h4 = QHBoxLayout(rowAdmin)
+        h4.setContentsMargins(12, 8, 12, 8)
+        h4.setSpacing(12)
+        self.switchAdmin = SwitchButton(rowAdmin)
+        self.switchAdmin.setOnText("开")
+        self.switchAdmin.setOffText("关")
+        self.switchAdmin.checkedChanged.connect(self.toggleAdmin)
+        h4.addWidget(StrongBodyLabel("管理员启动:"))
+        h4.addWidget(self.switchAdmin)
+        h4.addStretch(1)
+        g_startup.addWidget(rowAdmin)
+
+        # 静默启动
+        rowSilent = QWidget(self.scrollWidget)
+        h5 = QHBoxLayout(rowSilent)
+        h5.setContentsMargins(12, 8, 12, 8)
+        h5.setSpacing(12)
+        self.switchSilent = SwitchButton(rowSilent)
+        self.switchSilent.setOnText("开")
+        self.switchSilent.setOffText("关")
+        self.switchSilent.checkedChanged.connect(self.toggleSilent)
+        h5.addWidget(StrongBodyLabel("静默启动:"))
+        h5.addWidget(self.switchSilent)
+        h5.addStretch(1)
+        g_startup.addWidget(rowSilent)
+
+        # 加载启动配置状态
+        self._load_startup_config()
+
         self.addFooterSpacer()
+
+    def _load_startup_config(self):
+        """从配置和注册表加载启动相关的开关状态"""
+        # 开机自启：检查注册表
+        self.switchAutoStart.setChecked(self._is_auto_start_enabled())
+
+        # 管理员启动 & 静默启动：从配置读取
+        admin = self.mainCfg.get('startup', 'run_as_admin', False)
+        self.switchAdmin.setChecked(str(admin).lower() == 'true' or admin is True)
+
+        silent = self.mainCfg.get('startup', 'silent', False)
+        self.switchSilent.setChecked(str(silent).lower() == 'true' or silent is True)
+
+    @staticmethod
+    def _is_auto_start_enabled() -> bool:
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0, winreg.KEY_READ
+            )
+            val, _ = winreg.QueryValueEx(key, "ToudaWiFi")
+            winreg.CloseKey(key)
+            return os.path.exists(val)  # 注册表值指向的程序文件存在
+        except FileNotFoundError:
+            return False
+        except Exception:
+            return False
+
+    @staticmethod
+    def _get_app_exe_path() -> str:
+        """获取当前可执行文件路径（兼容 exe 和 .py 运行模式）"""
+        if getattr(sys, 'frozen', False):
+            return sys.executable
+        return sys.executable
+
+    def toggleAutoStart(self, checked: bool):
+        """开关开机自启注册表项"""
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0, winreg.KEY_SET_VALUE
+            )
+            if checked:
+                exe_path = self._get_app_exe_path()
+                winreg.SetValueEx(key, "ToudaWiFi", 0, winreg.REG_SZ, exe_path)
+                InfoBar.success(title='已开启', content='开机自启已启用', duration=1500, parent=self)
+            else:
+                try:
+                    winreg.DeleteValue(key, "ToudaWiFi")
+                except FileNotFoundError:
+                    pass
+                InfoBar.info(title='已关闭', content='开机自启已禁用', duration=1500, parent=self)
+            winreg.CloseKey(key)
+        except Exception as e:
+            InfoBar.error(title='操作失败', content=str(e), duration=2000, parent=self)
+            # 回退开关状态
+            self.switchAutoStart.setChecked(not checked)
+
+    def toggleAdmin(self, checked: bool):
+        """开关管理员启动（写入配置，启动时自动提权）"""
+        self.mainCfg.write('startup', 'run_as_admin', checked)
+        if checked:
+            InfoBar.success(title='已开启', content='下次启动时将自动请求管理员权限', duration=2000, parent=self)
+        else:
+            InfoBar.info(title='已关闭', content='管理员启动已禁用', duration=1500, parent=self)
+
+    def toggleSilent(self, checked: bool):
+        """开关静默启动（写入配置，启动时自动隐藏窗口）"""
+        self.mainCfg.write('startup', 'silent', checked)
+        if checked:
+            InfoBar.success(title='已开启', content='下次启动时窗口将自动隐藏到托盘', duration=2000, parent=self)
+        else:
+            InfoBar.info(title='已关闭', content='静默启动已禁用', duration=1500, parent=self)
 
     def saveInterval(self):
         seconds = int(self.spinInterval.value())

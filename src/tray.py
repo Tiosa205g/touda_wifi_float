@@ -55,7 +55,7 @@ class Tray(QSystemTrayIcon):
             weak_self = weakref.ref(self)
             try:
                 self._settings_win.destroyed.connect(
-                    lambda win=weak_self: win() is not None and setattr(win(), '_settings_win', None)
+                    lambda _, ws=weak_self: ws() is not None and setattr(ws(), '_settings_win', None)
                 )
             except Exception:
                 pass
