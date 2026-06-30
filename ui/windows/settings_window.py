@@ -35,15 +35,21 @@ from src.config import CfgParse
 from src.logging_config import logger
 
 
-CONFIG_DIR = os.path.join(os.getcwd(), "config")
-MAIN_CFG = os.path.join(CONFIG_DIR, "main.toml")
-LINKS_CFG = os.path.join(CONFIG_DIR, "links.toml")
+def _get_config_dir() -> str:
+    return os.path.join(os.getcwd(), "config")
+
+def _get_main_cfg() -> str:
+    return os.path.join(_get_config_dir(), "main.toml")
+
+def _get_links_cfg() -> str:
+    return os.path.join(_get_config_dir(), "links.toml")
 
 
 def ensure_cfg():
-    if not os.path.isdir(CONFIG_DIR):
-        os.makedirs(CONFIG_DIR, exist_ok=True)
-    for p in (MAIN_CFG, LINKS_CFG):
+    cfg_dir = _get_config_dir()
+    if not os.path.isdir(cfg_dir):
+        os.makedirs(cfg_dir, exist_ok=True)
+    for p in (_get_main_cfg(), _get_links_cfg()):
         if not os.path.exists(p):
             try:
                 with open(p, 'a', encoding='utf-8'):
@@ -55,9 +61,10 @@ def ensure_cfg():
 def list_account_files() -> List[str]:
     ensure_cfg()
     files = []
-    for f in os.listdir(CONFIG_DIR):
+    cfg_dir = _get_config_dir()
+    for f in os.listdir(cfg_dir):
         if f.startswith("account_") and f.endswith(".toml"):
-            files.append(os.path.join(CONFIG_DIR, f))
+            files.append(os.path.join(cfg_dir, f))
     # sort by index number
     def _idx(name: str) -> int:
         try:
@@ -131,7 +138,7 @@ class GeneralInterface(_BaseInterface):
     def __init__(self, parent=None):
         super().__init__(parent)
         ensure_cfg()
-        self.mainCfg = CfgParse(MAIN_CFG)
+        self.mainCfg = CfgParse(_get_main_cfg())
 
         # 常规：WiFi 状态检查间隔（秒）
         g_account = self.addGroup("常规")
@@ -152,7 +159,7 @@ class GeneralInterface(_BaseInterface):
         self.spinInterval.setValue(interval_s)
         self.btnSaveInterval = PushButton("保存")
         self.btnOpenDir = PushButton("打开配置文件夹")
-        self.btnOpenDir.clicked.connect(lambda: os.startfile(CONFIG_DIR))
+        self.btnOpenDir.clicked.connect(lambda: os.startfile(_get_config_dir()))
         self.btnSaveInterval.clicked.connect(self.saveInterval)
         h1.addWidget(StrongBodyLabel("WiFi 状态检查间隔(秒):"))
         h1.addWidget(self.spinInterval)
@@ -235,16 +242,23 @@ class GeneralInterface(_BaseInterface):
         self.addFooterSpacer()
 
     def _load_startup_config(self):
-        """从配置和注册表加载启动相关的开关状态"""
-        # 开机自启：检查注册表
-        self.switchAutoStart.setChecked(self._is_auto_start_enabled())
-
-        # 管理员启动 & 静默启动：从配置读取
-        admin = self.mainCfg.get('startup', 'run_as_admin', False)
-        self.switchAdmin.setChecked(str(admin).lower() == 'true' or admin is True)
-
-        silent = self.mainCfg.get('startup', 'silent', False)
-        self.switchSilent.setChecked(str(silent).lower() == 'true' or silent is True)
+        """从配置和注册表加载启动相关的开关状态（阻止信号触发通知）"""
+        # 阻断信号，避免 setChecked 触发 checkedChanged → InfoBar 弹窗
+        self.switchAutoStart.blockSignals(True)
+        self.switchAdmin.blockSignals(True)
+        self.switchSilent.blockSignals(True)
+        try:
+            # 开机自启：检查注册表
+            self.switchAutoStart.setChecked(self._is_auto_start_enabled())
+            # 管理员启动 & 静默启动：从配置读取
+            admin = self.mainCfg.get('startup', 'run_as_admin', False)
+            self.switchAdmin.setChecked(str(admin).lower() == 'true' or admin is True)
+            silent = self.mainCfg.get('startup', 'silent', False)
+            self.switchSilent.setChecked(str(silent).lower() == 'true' or silent is True)
+        finally:
+            self.switchAutoStart.blockSignals(False)
+            self.switchAdmin.blockSignals(False)
+            self.switchSilent.blockSignals(False)
 
     @staticmethod
     def _is_auto_start_enabled() -> bool:
@@ -256,7 +270,14 @@ class GeneralInterface(_BaseInterface):
             )
             val, _ = winreg.QueryValueEx(key, "ToudaWiFi")
             winreg.CloseKey(key)
-            return os.path.exists(val)  # 注册表值指向的程序文件存在
+            # 注册表值可能带参数：C:\path\main.exe --auto-start
+            # 或带引号："python.exe" "main.py" --auto-start
+            # 需要提取出真正的可执行文件路径
+            if val.startswith('"'):
+                exe_path = val.split('"')[1]
+            else:
+                exe_path = val.split(maxsplit=1)[0]
+            return os.path.exists(exe_path)
         except FileNotFoundError:
             return False
         except Exception:
@@ -264,9 +285,15 @@ class GeneralInterface(_BaseInterface):
 
     @staticmethod
     def _get_app_exe_path() -> str:
-        """获取当前可执行文件路径（兼容 exe 和 .py 运行模式）"""
+        """获取可执行文件路径（兼容 exe 和 .py 运行模式）"""
         if getattr(sys, 'frozen', False):
+            # Nuitka 打包的 exe
             return sys.executable
+        # 源码运行：python.exe + main.py 全路径
+        main_py = os.path.join(os.getcwd(), 'main.py')
+        if os.path.exists(main_py):
+            return f'"{sys.executable}" "{main_py}"'
+        # fallback
         return sys.executable
 
     def toggleAutoStart(self, checked: bool):
@@ -278,7 +305,7 @@ class GeneralInterface(_BaseInterface):
                 0, winreg.KEY_SET_VALUE
             )
             if checked:
-                exe_path = self._get_app_exe_path()
+                exe_path = self._get_app_exe_path() + " --auto-start"
                 winreg.SetValueEx(key, "ToudaWiFi", 0, winreg.REG_SZ, exe_path)
                 InfoBar.success(title='已开启', content='开机自启已启用', duration=1500, parent=self)
             else:
@@ -295,6 +322,13 @@ class GeneralInterface(_BaseInterface):
 
     def toggleAdmin(self, checked: bool):
         """开关管理员启动（写入配置，启动时自动提权）"""
+        if not getattr(sys, 'frozen', False) and checked:
+            # 源码运行：提示不支持，回退开关
+            InfoBar.warning(title='提示', content='源码运行无需管理员权限，打包为 exe 后生效', duration=3000, parent=self)
+            self.switchAdmin.blockSignals(True)
+            self.switchAdmin.setChecked(False)
+            self.switchAdmin.blockSignals(False)
+            return
         self.mainCfg.write('startup', 'run_as_admin', checked)
         if checked:
             InfoBar.success(title='已开启', content='下次启动时将自动请求管理员权限', duration=2000, parent=self)
@@ -343,7 +377,7 @@ class WebVpnInterface(_BaseInterface):
     def __init__(self, parent=None):
         super().__init__(parent)
         ensure_cfg()
-        self.mainCfg = CfgParse(MAIN_CFG)
+        self.mainCfg = CfgParse(_get_main_cfg())
 
         g_webvpn = self.addGroup("WebVPN")
 
@@ -444,7 +478,7 @@ class AccountsInterface(_BaseInterface):
     def __init__(self, parent=None):
         super().__init__(parent)
         ensure_cfg()
-        self.mainCfg = CfgParse(MAIN_CFG)
+        self.mainCfg = CfgParse(_get_main_cfg())
 
         g = self.addGroup("WiFi账户管理")
 
@@ -539,7 +573,7 @@ class AccountsInterface(_BaseInterface):
         idx = 0
         while idx in used:
             idx += 1
-        new_path = os.path.join(CONFIG_DIR, f"account_{idx}.toml")
+        new_path = os.path.join(_get_config_dir(), f"account_{idx}.toml")
         open(new_path, 'w', encoding='utf-8').close()
         name = self.editName.text().strip() or "new_user"
         pwd = self.editPwd.text()
@@ -591,7 +625,7 @@ class LinksInterface(_BaseInterface):
     def __init__(self, parent=None):
         super().__init__(parent)
         ensure_cfg()
-        self.linksCfg = CfgParse(LINKS_CFG)
+        self.linksCfg = CfgParse(_get_links_cfg())
 
         g = self.addGroup("链接管理")
 

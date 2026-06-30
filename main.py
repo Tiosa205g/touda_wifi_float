@@ -3,6 +3,21 @@ import os
 import gc
 from pathlib import Path
 
+
+def _fix_working_dir():
+    """将工作目录切换到程序所在目录，确保 os.getcwd() 始终指向正确位置"""
+    if getattr(sys, 'frozen', False):
+        # Nuitka 打包的 exe
+        exe_dir = os.path.dirname(sys.executable)
+    else:
+        # 源码运行：main.py 所在目录
+        exe_dir = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(exe_dir)
+
+
+# 在导入业务模块前切换工作目录，否则所有 os.getcwd() 都会跑偏
+_fix_working_dir()
+
 # import init
 from src.logging_config import logger
 from src.config import CfgParse
@@ -62,9 +77,14 @@ if __name__ == "__main__":
     init_config()
 
     # ── 管理员启动检查 ──
+    # 从注册表启动时带 --auto-start 标记，跳过提权，否则开机弹 UAC 没人点
+    is_auto_start = '--auto-start' in argv
+    if is_auto_start:
+        logger.info("开机自启模式：跳过管理员提权检查")
+
     cfg = CfgParse(MAIN_CFG)
     need_admin = str(cfg.get('startup', 'run_as_admin', False)).lower() == 'true'
-    if need_admin and not _is_admin():
+    if need_admin and not _is_admin() and not is_auto_start and getattr(sys, 'frozen', False):
         logger.info("检测到管理员启动配置，正在请求提权…")
         _request_admin_restart()
 

@@ -10,3 +10,4 @@ config.toml
 .vscode/
 .omo/
 AGENTS.md
+CLAUDE.md
