@@ -6,11 +6,11 @@ from functools import partial
 from PySide6.QtCore import QPoint, QTimer, QPropertyAnimation
 from PySide6.QtGui import Qt
 from PySide6.QtWidgets import QApplication
-from qfluentwidgets import TeachingTip, RoundMenu, Action, Dialog
+from qfluentwidgets import TeachingTip, RoundMenu, Action, Dialog, InfoBar
 from qfluentwidgets import FluentIcon as FIF
 from ui.float_ball import UI_FloatBall
 from ui.windows.drag_window import DragWindow
-from src import touda, config
+from src import touda, config, update_checker
 from src.logging_config import logger
 
 
@@ -41,9 +41,10 @@ class MyRoundMenu(RoundMenu):
 
 
 class FloatBall(DragWindow):
-    def __init__(self, screen_size, app: QApplication):
+    def __init__(self, screen_size, app: QApplication, version: str = "v0.0.0"):
         super().__init__()
         self.app = app
+        self._version = version
         self.ui = UI_FloatBall()
         self.ui.setupUI(self)
         self.setFixedSize(self.ui.waterBall.size())
@@ -82,6 +83,9 @@ class FloatBall(DragWindow):
         self._cached_menu = None  # 右键菜单缓存（首次打开时构建，后续复用）
         self._switch_thread = None  # 账号切换后台线程引用
         self._switch_worker = None  # 账号切换 Worker 引用
+        self._update_thread = None  # 检查更新后台线程引用
+        self._update_worker = None  # 检查更新 Worker 引用
+        self._pending_update = None  # 待显示的更新信息（静默启动时缓存）
         x, y = self.main_cfg.get("main", "x", 0), self.main_cfg.get(
             "main", "y", 0
         )  # 设置初始位置为上一次关闭位置
@@ -94,9 +98,24 @@ class FloatBall(DragWindow):
         super().hideEvent(event)
 
     def showEvent(self, event):
-        """窗口显示时恢复波浪动画"""
+        """窗口显示时恢复波浪动画，并弹出缓存的更新提示（静默启动场景）"""
         if self.ui.waterBall.wave_animation.state() == QPropertyAnimation.Paused:
             self.ui.waterBall.wave_animation.resume()
+
+        # 如果有待显示的更新信息，此时弹出
+        if self._pending_update is not None:
+            raw = self._pending_update
+            self._pending_update = None
+            from ui.components.update_dialog import UpdateDialog
+            dlg = UpdateDialog(
+                current_version=self._version,
+                latest_tag=raw.tag_name,
+                release_body=raw.body,
+                download_url=raw.html_url,
+                parent=self,
+            )
+            dlg.exec()
+
         super().showEvent(event)
 
     def waterBall_menu(self, pos):
@@ -359,6 +378,86 @@ class FloatBall(DragWindow):
             self._switch_thread = None
             self._switch_worker = None
             logger.exception(f"切换账号出错: {e}")
+
+    def check_update(self, silent: bool = True):
+        """检查版本更新
+
+        Args:
+            silent: 如果为 True，没有新版本时静默（不弹提示）；
+                     如果为 False，无论有没有新版本都会弹提示
+        """
+        try:
+            # 如果已有检查线程在运行，跳过（捕获 RuntimeError 防止 C++ 对象已删除）
+            try:
+                thread_busy = (
+                    self._update_thread is not None
+                    and self._update_thread.isRunning()
+                )
+            except RuntimeError:
+                thread_busy = False
+                self._update_thread = None
+                self._update_worker = None
+            if thread_busy:
+                return
+
+            from src.touda import start_worker_in_thread
+            from PySide6.QtCore import Qt as QtNS
+
+            # 用 list 做闭包容器存储线程结果，避免通过 Signal(object) 传递自定义对象（QueuedConnection 会序列化失败）
+            _result = []
+
+            def do_check():
+                _result.append(update_checker.check_for_update(self._version))
+
+            def on_finished():
+                # 线程结束后读取闭包中的结果
+                raw = _result[0] if _result else None
+                # 清理线程引用
+                if self._update_thread is thread and self._update_worker is worker:
+                    self._update_thread = None
+                    self._update_worker = None
+
+                if isinstance(raw, Exception):
+                    if not silent:
+                        InfoBar.error(
+                            title="检查更新失败",
+                            content="网络异常，请稍后重试",
+                            duration=3000,
+                            parent=self,
+                        )
+                    return
+
+                if raw is None:
+                    if not silent:
+                        InfoBar.info(
+                            title="已是最新版",
+                            content="当前没有可用更新",
+                            duration=3000,
+                            parent=self,
+                        )
+                    return
+
+                # 有新版本：窗口可见直接弹，隐藏时缓存等 showEvent
+                if self.isVisible():
+                    from ui.components.update_dialog import UpdateDialog
+                    dlg = UpdateDialog(
+                        current_version=self._version,
+                        latest_tag=raw.tag_name,
+                        release_body=raw.body,
+                        download_url=raw.html_url,
+                        parent=self,
+                    )
+                    dlg.exec()
+                else:
+                    self._pending_update = raw
+
+            thread, worker = start_worker_in_thread(do_check, "检查更新")
+            thread.finished.connect(on_finished, QtNS.QueuedConnection)
+            self._update_thread = thread
+            self._update_worker = worker
+
+        except Exception:
+            logger.exception("检查更新失败")
 
 
 class Update_timer(QTimer):

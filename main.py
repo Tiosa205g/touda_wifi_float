@@ -125,7 +125,7 @@ if __name__ == "__main__":
         logger.info(f"应用主题设置: {theme_value}")
     except Exception:
         pass
-    win = win_float_ball.FloatBall(app.primaryScreen().size(), app)
+    win = win_float_ball.FloatBall(app.primaryScreen().size(), app, VERSION)
     win.setWindowIcon(QIcon("res/ico/favicon.ico"))
     # 限制 QPixmapCache 大小（默认 10MB → 5MB），减少 bitmap 缓存占用
     QPixmapCache.setCacheLimit(5120)
@@ -153,6 +153,17 @@ if __name__ == "__main__":
     webvpn_thread, webvpn_worker = start_worker_in_thread(
         win.webvpn.autoLogin, "webvpn登录"
     )
+
+    # ── 启动时自动检查更新（根据配置） ──
+    try:
+        auto_check = str(cfg.get('update', 'auto_check', True)).lower() == 'true'
+        if auto_check:
+            from PySide6.QtCore import QTimer
+            # 延迟3秒再检查，让 UI 先完全加载
+            # 检查到新版本后：窗口可见立即弹窗，静默启动待窗口显示后再弹
+            QTimer.singleShot(3000, lambda: win.check_update(silent=True))
+    except Exception:
+        pass
 
     win.show()
 

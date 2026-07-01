@@ -138,6 +138,8 @@ class GeneralInterface(_BaseInterface):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.mainCfg = CfgParse(_get_main_cfg())
+        self._update_thread = None
+        self._update_worker = None
 
         # 常规：WiFi 状态检查间隔（秒）
         g_account = self.addGroup("常规")
@@ -237,6 +239,38 @@ class GeneralInterface(_BaseInterface):
 
         # 加载启动配置状态
         self._load_startup_config()
+
+        # ── 更新管理 ──
+        g_update = self.addGroup("更新")
+
+        # 自动检查更新
+        rowAutoUpdate = QWidget(self.scrollWidget)
+        h6 = QHBoxLayout(rowAutoUpdate)
+        h6.setContentsMargins(12, 8, 12, 8)
+        h6.setSpacing(12)
+        self.switchAutoUpdate = SwitchButton(rowAutoUpdate)
+        self.switchAutoUpdate.setOnText("开")
+        self.switchAutoUpdate.setOffText("关")
+        self.switchAutoUpdate.checkedChanged.connect(self.toggleAutoUpdate)
+        h6.addWidget(StrongBodyLabel("自动检查更新:"))
+        h6.addWidget(self.switchAutoUpdate)
+        h6.addStretch(1)
+        g_update.addWidget(rowAutoUpdate)
+
+        # 检查更新按钮
+        rowCheckNow = QWidget(self.scrollWidget)
+        h7 = QHBoxLayout(rowCheckNow)
+        h7.setContentsMargins(12, 8, 12, 8)
+        h7.setSpacing(12)
+        self.btnCheckNow = PushButton("立即检查更新")
+        self.btnCheckNow.setFixedWidth(130)
+        self.btnCheckNow.clicked.connect(self.checkUpdateNow)
+        h7.addWidget(self.btnCheckNow)
+        h7.addStretch(1)
+        g_update.addWidget(rowCheckNow)
+
+        # 加载更新配置状态
+        self._load_update_config()
 
         self.addFooterSpacer()
 
@@ -371,6 +405,97 @@ class GeneralInterface(_BaseInterface):
         except Exception:
             pass
         InfoBar.success(title='已应用', content=f'主题已切换为 {self.cmbTheme.currentText()}', duration=1200, parent=self)
+
+    def _load_update_config(self):
+        """加载更新相关的配置状态"""
+        self.switchAutoUpdate.blockSignals(True)
+        try:
+            auto_check = self.mainCfg.get('update', 'auto_check', True)
+            self.switchAutoUpdate.setChecked(str(auto_check).lower() == 'true' or auto_check is True)
+        finally:
+            self.switchAutoUpdate.blockSignals(False)
+
+    def toggleAutoUpdate(self, checked: bool):
+        """开关自动检查更新"""
+        self.mainCfg.write('update', 'auto_check', checked)
+        if checked:
+            InfoBar.success(title='已开启', content='下次启动时将自动检查更新', duration=2000, parent=self)
+        else:
+            InfoBar.info(title='已关闭', content='启动时将不再自动检查更新', duration=1500, parent=self)
+
+    def checkUpdateNow(self):
+        """立即检查更新"""
+        # 防止重复点击和线程泄漏
+        try:
+            thread_busy = (
+                self._update_thread is not None
+                and self._update_thread.isRunning()
+            )
+        except RuntimeError:
+            thread_busy = False
+            self._update_thread = None
+            self._update_worker = None
+        if thread_busy:
+            return
+
+        self.btnCheckNow.setEnabled(False)
+        self.btnCheckNow.setText("检查中...")
+
+        from src.update_checker import check_for_update
+        from src.config import CfgParse
+        from PySide6.QtCore import QTimer
+
+        # 从 main.py 读取 VERSION（避免动态导入执行模块级副作用）
+        import re as _re
+        _version_file = os.path.join(os.getcwd(), 'main.py')
+        current_version = 'v0.0.0'
+        try:
+            with open(_version_file, 'r', encoding='utf-8') as _f:
+                _m = _re.search(r'^VERSION\s*=\s*["\']([^"\']+)["\']', _f.read(), _re.MULTILINE)
+                if _m:
+                    current_version = _m.group(1)
+        except Exception:
+            pass
+
+        # 用 list 做闭包容器存储线程结果，避免通过 Signal(object) 传递自定义对象（QueuedConnection 会序列化失败）
+        _result = []
+
+        def do_check():
+            _result.append(check_for_update(current_version))
+
+        def on_finished():
+            self.btnCheckNow.setEnabled(True)
+            self.btnCheckNow.setText("立即检查更新")
+            if self._update_thread is thread and self._update_worker is worker:
+                self._update_thread = None
+                self._update_worker = None
+
+            raw = _result[0] if _result else None
+            if isinstance(raw, Exception) or raw is None:
+                if raw is None:
+                    InfoBar.info(title='已是最新版', content=f'当前 {current_version} 已是最新版本', duration=3000, parent=self)
+                else:
+                    InfoBar.error(title='检查失败', content='网络异常，请稍后重试', duration=3000, parent=self)
+                return
+
+            # 有新版本
+            desc = raw.summary()
+            from ui.components.update_dialog import UpdateDialog
+            dlg = UpdateDialog(
+                current_version=current_version,
+                latest_tag=raw.tag_name,
+                release_body=raw.body,
+                download_url=raw.html_url,
+                parent=self.window(),
+            )
+            dlg.exec()
+
+        from src.touda import start_worker_in_thread
+        thread, worker = start_worker_in_thread(do_check, "检查更新")
+        from PySide6.QtCore import Qt as QtNS
+        thread.finished.connect(on_finished, QtNS.QueuedConnection)
+        self._update_thread = thread
+        self._update_worker = worker
 
 
 class WebVpnInterface(_BaseInterface):
