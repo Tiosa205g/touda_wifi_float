@@ -38,7 +38,15 @@ if exist "%ICON_PATH%" (
     echo Warning: Icon file "%ICON_PATH%" not found, using default icon
 )
 
-:: 5. Activate venv and compile with Nuitka
+:: 5. Extract version from main.py
+for /f "tokens=2 delims== " %%a in ('findstr /b "VERSION" "%SCRIPT_NAME%"') do set "RAW_VER=%%a"
+set "RAW_VER=%RAW_VER:"=%"
+set "RAW_VER=%RAW_VER:v=%"
+:: Ensure a.b.c.d format for Nuitka
+for /f "tokens=1-4 delims=." %%a in ("%RAW_VER%.0.0.0") do set "FILE_VER=%%a.%%b.%%c.%%d"
+echo Version for EXE metadata: %FILE_VER%
+
+:: 6. Activate venv and compile with Nuitka
 echo Activating virtual environment: "%VENV_DIR%"...
 call "%VENV_DIR%\Scripts\activate.bat"
 
@@ -61,6 +69,12 @@ echo Starting Nuitka compilation for "%SCRIPT_NAME%"...
     --follow-imports ^
     --show-progress ^
     --show-memory ^
+    --windows-company-name="Tiosa" ^
+    --windows-product-name="Touda WiFi Float" ^
+    --windows-file-description="汕大校园网工具 - 悬浮球版" ^
+    --windows-file-version="%FILE_VER%" ^
+    --windows-product-version="%FILE_VER%" ^
+    --windows-legal-copyright="Copyright (c) 2025-2026 Tiosa. All rights reserved." ^
     "%SCRIPT_NAME%"
 
 :: 6. Check compilation result

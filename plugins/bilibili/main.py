@@ -140,6 +140,3 @@ class Plugin:
             webbrowser.open(final_url)
             self.sdk.logger_info(f"已打开直播: {item}")
 
-    # def show_twfid(self):
-    #     twfid = self.api.webvpn.twfid or "未登录"
-    #     self.sdk.logger_info(f"当前TWFID: {twfid}")

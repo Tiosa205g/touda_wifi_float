@@ -1,6 +1,5 @@
 import sys
 import os
-import gc
 from pathlib import Path
 
 
@@ -56,6 +55,15 @@ def init_config():
                 Path(f"config/{file}.toml").touch()
 
 
+def _parse_theme(theme_value: str):
+    """将主题字符串(auto/light/dark)转为 Theme 枚举"""
+    from qfluentwidgets import Theme
+    v = str(theme_value or "auto").lower()
+    if v == "auto":
+        return Theme.AUTO
+    return Theme.LIGHT if v == "light" else Theme.DARK
+
+
 def _is_admin() -> bool:
     """检查当前进程是否以管理员权限运行"""
     try:
@@ -99,25 +107,20 @@ if __name__ == "__main__":
         logger.info("静默启动模式：窗口启动后自动隐藏到托盘")
 
     from PySide6.QtGui import QIcon, QPixmapCache
-    from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication
     from src.touda import start_worker_in_thread
     from src import win_float_ball
     from src.plugin_manager import Manager
     from src.tray import Tray
-    from qfluentwidgets import setTheme, Theme
+    from qfluentwidgets import setTheme
 
     app = QApplication()
     app.setQuitOnLastWindowClosed(False)
     # 根据配置设置主题（自动/浅色/深色）
     try:
         cfg = CfgParse(MAIN_CFG)
-        theme_value = str(cfg.get("ui", "theme", "auto") or "auto").lower()
-        t = (
-            Theme.AUTO
-            if theme_value == "auto"
-            else (Theme.LIGHT if theme_value == "light" else Theme.DARK)
-        )
+        theme_value = cfg.get("ui", "theme", "auto")
+        t = _parse_theme(theme_value)
         setTheme(t)
         logger.info(f"应用主题设置: {theme_value}")
     except Exception:
@@ -126,11 +129,6 @@ if __name__ == "__main__":
     win.setWindowIcon(QIcon("res/ico/favicon.ico"))
     # 限制 QPixmapCache 大小（默认 10MB → 5MB），减少 bitmap 缓存占用
     QPixmapCache.setCacheLimit(5120)
-
-    # 定时从主线程回收 Python GC，避免跨线程删除 QObject
-    gc_timer = QTimer(win)
-    gc_timer.timeout.connect(gc.collect)
-    gc_timer.start(60000)  # 每 60 秒回收一次
 
     win.tray = Tray(win, VERSION)
     win.pm = Manager(

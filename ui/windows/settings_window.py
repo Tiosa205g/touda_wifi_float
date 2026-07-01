@@ -137,7 +137,6 @@ class GeneralInterface(_BaseInterface):
     """常规设置：打开配置文件夹"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        ensure_cfg()
         self.mainCfg = CfgParse(_get_main_cfg())
 
         # 常规：WiFi 状态检查间隔（秒）
@@ -291,7 +290,7 @@ class GeneralInterface(_BaseInterface):
     @staticmethod
     def _get_app_exe_path() -> str:
         """获取可执行文件路径（兼容 exe 和 .py 运行模式）"""
-        if SettingsWindow._is_source():
+        if GeneralInterface._is_source():
             # 源码运行：python.exe + main.py 全路径
             main_py = os.path.join(os.getcwd(), 'main.py')
             if os.path.exists(main_py):
@@ -357,21 +356,18 @@ class GeneralInterface(_BaseInterface):
     def applyTheme(self, *_):
         idx = self.cmbTheme.currentIndex()
         val = 'auto' if idx == 0 else ('light' if idx == 1 else 'dark')
-        # 写入配置
         self.mainCfg.write('ui', 'theme', val)
-        # 应用主题
-        t = Theme.AUTO if val == 'auto' else (Theme.LIGHT if val == 'light' else Theme.DARK)
+        t = Theme.AUTO if val == 'auto' else (Theme.LIGHT if val == 'dark' else Theme.DARK)
         try:
             setTheme(t)
         except Exception:
             pass
-        # 通知父窗口更新样式（浅/深不同配色） 
+        # 通知父窗口更新样式
         try:
             sw = self.window()
             if hasattr(sw, 'applyCustomStyleForTheme'):
-                # AUTO 时根据系统当前深浅选择样式
-                theme_for_style = Theme.DARK if (t == Theme.DARK or (t == Theme.AUTO and isDarkTheme())) else Theme.LIGHT
-                sw.applyCustomStyleForTheme(theme_for_style)
+                is_dark = t == Theme.DARK or (t == Theme.AUTO and isDarkTheme())
+                sw.applyCustomStyleForTheme(Theme.DARK if is_dark else Theme.LIGHT)
         except Exception:
             pass
         InfoBar.success(title='已应用', content=f'主题已切换为 {self.cmbTheme.currentText()}', duration=1200, parent=self)
@@ -381,7 +377,6 @@ class WebVpnInterface(_BaseInterface):
     """WebVPN 设置：账号/密码/密钥，TWFID 操作"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        ensure_cfg()
         self.mainCfg = CfgParse(_get_main_cfg())
 
         g_webvpn = self.addGroup("WebVPN")
@@ -482,7 +477,6 @@ class AccountsInterface(_BaseInterface):
     """账户管理：新增/修改/删除 WiFi 账户"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        ensure_cfg()
         self.mainCfg = CfgParse(_get_main_cfg())
 
         g = self.addGroup("WiFi账户管理")
@@ -629,7 +623,6 @@ class LinksInterface(_BaseInterface):
     """链接管理：简单的按类别管理、导入/导出"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        ensure_cfg()
         self.linksCfg = CfgParse(_get_links_cfg())
 
         g = self.addGroup("链接管理")
@@ -830,6 +823,7 @@ class LinksInterface(_BaseInterface):
 class SettingsWindow(FluentWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
+        ensure_cfg()  # 确保配置目录和文件存在（一次即可）
         self.setWindowTitle('设置 - Touda WiFi')
         self.setFixedSize(1000, 600)  # 固定宽度 1000，高度 600
         self.setResizeEnabled(False)

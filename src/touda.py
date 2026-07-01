@@ -2,7 +2,6 @@ from typing import Any
 from py_mini_racer import MiniRacer
 
 import pyotp
-import json
 import requests
 import re
 import base64
@@ -84,36 +83,19 @@ class encrypt:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
     }
 
-    def gettotpkey(self, key, method=0) -> str:
+    def gettotpkey(self, key) -> str:
         """
         获取totp的6位动态口令
         Args:
             key: 生成totp的秘钥
-            method: 0为使用pyotp库,1为使用接口
         Returns:
             6位动态口令，失败返回000000
         """
-        if method == 0:
-            # pyotp
+        try:
             totp = pyotp.TOTP(key)
             return totp.now()
-        elif method == 1:
-            # 接口
-            try:
-                res = requests.post(
-                    "http://www.2fafb.com/api/jiekou.php",
-                    data={"tok": key},
-                    headers=self.header,
-                    timeout=10,
-                )
-                if res.status_code != 200:
-                    return "000000"
-                data = json.loads(res.text)
-                return data["data"]
-            except Exception:
-                logger.exception("gettotpkey 请求失败")
-                return "000000"
-        else:
+        except Exception:
+            logger.exception("gettotpkey 失败")
             return "000000"
 
     # 解码后的 JS 加密脚本缓存（避免每次 getpwds 都重复 Base64 解码）
@@ -289,24 +271,24 @@ class webvpn(QObject):
         logger.info(f"登录成功，TWFID: {self.twfid}")
         return cookies_v
 
+    def _clear_twfid(self):
+        self.session.cookies.clear_session_cookies()
+        self.twfid = ""
+        self.twfid_update.emit(self.twfid)
+
     def getState(self):
         r = self.session.get(
             "https://webvpn.stu.edu.cn/por/conf.csp?apiversion=1", headers=self.header
         )
-        # print(r.content.decode())
         if r.status_code == 200:
             ret = (
                 "unexpected user service" not in r.content.decode()
             )  # 检测是否是在登录页面
             if not ret:
-                self.session.cookies.clear_session_cookies()
-                self.twfid = ""
-                self.twfid_update.emit(self.twfid)
+                self._clear_twfid()
             return ret
         else:
-            self.session.cookies.clear_session_cookies()
-            self.twfid = ""
-            self.twfid_update.emit(self.twfid)
+            self._clear_twfid()
             return False
 
     def create_url(self, url: str) -> str:
@@ -416,19 +398,12 @@ class wifi(QObject):
                 "name": self.name,
             }.__str__()
 
-        def __repr__(self):
-            return {
-                "state": self.state,
-                "total": self.total,
-                "used": self.used,
-                "name": self.name,
-            }.__repr__()
+        __repr__ = __str__
 
     # 类级别共享配置——所有实例及引用方共享同一份
     _name = ""
     _password = ""
 
-    __state = None
     state_update: Signal = Signal(state)
     flux_update: Signal = Signal(float, float)
 
