@@ -103,12 +103,12 @@ jobs:
             --follow-imports `
             --remove-output `
             --show-memory `
-            --windows-company-name="Tiosa" `
-            --windows-product-name="Touda WiFi Float" `
-            --windows-file-description="汕大校园网工具 - 悬浮球版" `
-            --windows-file-version="$env:NUITKA_VERSION" `
-            --windows-product-version="$env:NUITKA_VERSION" `
-            --windows-legal-copyright="Copyright (c) 2025-2026 Tiosa. All rights reserved." `
+            --company-name="Tiosa" `
+            --product-name="Touda WiFi Float" `
+            --file-description="汕大校园网工具 - 悬浮球版" `
+            --file-version="$env:NUITKA_VERSION" `
+            --product-version="$env:NUITKA_VERSION" `
+            --copyright="Copyright (c) 2025-2026 Tiosa. All rights reserved." `
             main.py
 
       - name: Prepare release artifacts

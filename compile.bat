@@ -69,12 +69,12 @@ echo Starting Nuitka compilation for "%SCRIPT_NAME%"...
     --follow-imports ^
     --show-progress ^
     --show-memory ^
-    --windows-company-name="Tiosa" ^
-    --windows-product-name="Touda WiFi Float" ^
-    --windows-file-description="汕大校园网工具 - 悬浮球版" ^
-    --windows-file-version="%FILE_VER%" ^
-    --windows-product-version="%FILE_VER%" ^
-    --windows-legal-copyright="Copyright (c) 2025-2026 Tiosa. All rights reserved." ^
+    --company-name="Tiosa" ^
+    --product-name="Touda WiFi Float" ^
+    --file-description="汕大校园网工具 - 悬浮球版" ^
+    --file-version="%FILE_VER%" ^
+    --product-version="%FILE_VER%" ^
+    --copyright="Copyright (c) 2025-2026 Tiosa. All rights reserved." ^
     "%SCRIPT_NAME%"
 
 :: 6. Check compilation result
