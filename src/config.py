@@ -55,9 +55,18 @@ class CfgParse:
         except (NonExistentKey, KeyError):
             return default
 
-    def write(self, section: str, option: str, value):
-        """写入单个配置项，写前从磁盘重载以防冲突"""
-        self.reload()
+    def write(self, section: str, option: str, value, reload_first: bool = True):
+        """写入单个配置项
+
+        Args:
+            section: 配置文件的节名
+            option: 配置文件的项名
+            value: 要写入的值
+            reload_first: 写入前是否从磁盘重载（默认 True 以防外部修改冲突）。
+                          纯写入高频场景（如保存窗口坐标）可设为 False 以减少 I/O。
+        """
+        if reload_first:
+            self.reload()
         doc = self._cache[self.path]
         if section not in doc:
             doc[section] = {option: value}

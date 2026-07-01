@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v1.4.7-blue)
+![Version](https://img.shields.io/badge/version-v1.4.7.1-blue)
 ![Python](https://img.shields.io/badge/python-3.12+-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 ![Build](https://img.shields.io/github/actions/workflow/status/Tiosa205g/touda_wifi_float/build.yaml?branch=main)

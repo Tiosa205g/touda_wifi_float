@@ -1,3 +1,4 @@
+import threading
 from typing import Any
 from py_mini_racer import MiniRacer
 
@@ -102,6 +103,7 @@ class encrypt:
     _decoded_js = None
     # 复用的 MiniRacer 实例（避免每次登录都创建新的 V8 引擎，节省 ~10-20MB）
     _mr_instance = None
+    _mr_lock = threading.Lock()
 
     @classmethod
     def _get_decoded_js(cls) -> str:
@@ -119,10 +121,12 @@ class encrypt:
         id = "_".join([pwd, rand])  # pwd_rand
         js = self._get_decoded_js().replace("###this###is###r###", r)
         # 复用 MiniRacer 实例，避免每次创建新的 V8 引擎（~10-20MB/个）
-        if encrypt._mr_instance is None:
-            encrypt._mr_instance = MiniRacer()
-        encrypt._mr_instance.eval(js)
-        result = encrypt._mr_instance.call("getkey", id)
+        # 加锁避免多线程竞态条件（MiniRacer 非线程安全）
+        with encrypt._mr_lock:
+            if encrypt._mr_instance is None:
+                encrypt._mr_instance = MiniRacer()
+            encrypt._mr_instance.eval(js)
+            result = encrypt._mr_instance.call("getkey", id)
         return result
 
 

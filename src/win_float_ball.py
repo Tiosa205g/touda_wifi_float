@@ -13,7 +13,10 @@ from ui.windows.drag_window import DragWindow
 from src import touda, config
 from src.logging_config import logger
 
-path = os.getcwd()
+
+def _cfg_dir() -> str:
+    """获取配置目录路径（延迟求值，避免模块导入时锁定 os.getcwd()）"""
+    return os.path.join(os.getcwd(), "config")
 
 
 class MyRoundMenu(RoundMenu):
@@ -51,9 +54,9 @@ class FloatBall(DragWindow):
         self.ui.waterBall.customContextMenuRequested.connect(self.waterBall_menu)
 
         # 初始化配置和核心对象
-        self.main_cfg = config.CfgParse(path + "/config/main.toml")
+        self.main_cfg = config.CfgParse(os.path.join(os.getcwd(), "config", "main.toml"))
         current_cfg = config.CfgParse(
-            path + f"/config/account_{self.main_cfg.get('main','current_account',0)}.toml"
+            os.path.join(os.getcwd(), "config", f"account_{self.main_cfg.get('main','current_account',0)}.toml")
         )
         webvpn_name = self.main_cfg.get("webvpn", "name", "")
         webvpn_password = base64.b64decode(
@@ -77,6 +80,8 @@ class FloatBall(DragWindow):
 
         self.update_timer = Update_timer(self.wifi, parent=self)
         self._cached_menu = None  # 右键菜单缓存（首次打开时构建，后续复用）
+        self._switch_thread = None  # 账号切换后台线程引用
+        self._switch_worker = None  # 账号切换 Worker 引用
         x, y = self.main_cfg.get("main", "x", 0), self.main_cfg.get(
             "main", "y", 0
         )  # 设置初始位置为上一次关闭位置
@@ -289,7 +294,7 @@ class FloatBall(DragWindow):
         """
         添加链接菜单到菜单上
         """
-        link_all = config.CfgParse(path + "/config/links.toml").get_all()
+        link_all = config.CfgParse(os.path.join(os.getcwd(), "config", "links.toml")).get_all()
 
         for link_type in link_all:
             linkType = MyRoundMenu(link_type, parent=menu)
@@ -303,9 +308,6 @@ class FloatBall(DragWindow):
                     )
                 )
             menu.addMenu(linkType)
-
-    _switch_thread = None
-    _switch_worker = None
 
     def change_account(self, name, password, index, *args):
         """
@@ -326,7 +328,7 @@ class FloatBall(DragWindow):
             return
 
         try:
-            main = config.CfgParse(path + "/config/main.toml")
+            main = config.CfgParse(os.path.join(os.getcwd(), "config", "main.toml"))
             from PySide6.QtCore import Qt as QtNS
 
             # 先保存当前账号索引，确保重启后使用新账号（无论登录是否成功）
@@ -364,7 +366,7 @@ class Update_timer(QTimer):
         super().__init__(parent=parent)
         try:
             self.wifi = wifi
-            main = config.CfgParse(os.getcwd() + "/config/main.toml")
+            main = config.CfgParse(os.path.join(os.getcwd(), "config", "main.toml"))
             interval = int(main.get("main", "timer_interval", 60000))
         except Exception:
             interval = 60000

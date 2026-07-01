@@ -357,7 +357,7 @@ class GeneralInterface(_BaseInterface):
         idx = self.cmbTheme.currentIndex()
         val = 'auto' if idx == 0 else ('light' if idx == 1 else 'dark')
         self.mainCfg.write('ui', 'theme', val)
-        t = Theme.AUTO if val == 'auto' else (Theme.LIGHT if val == 'dark' else Theme.DARK)
+        t = Theme.AUTO if val == 'auto' else (Theme.LIGHT if val == 'light' else Theme.DARK)
         try:
             setTheme(t)
         except Exception:
@@ -844,11 +844,9 @@ class SettingsWindow(FluentWindow):
         self.titleBar.setDoubleClickEnabled(False) # 禁止双击最大化/还原
         
         # 优先启用云母/亚克力效果（Win11/Win10支持）
-        mica_enabled = False
         for api in ('setMicaEffectEnabled', 'setAcrylicEffectEnabled'):
             try:
                 getattr(self, api)(True)
-                mica_enabled = True
                 break
             except Exception:
                 continue
@@ -889,7 +887,7 @@ class SettingsWindow(FluentWindow):
 
         self.move(self.geometry().center() - self.rect().center())# 居中
 
-        logger.info('设置窗口初始化完毕 mica=%s', mica_enabled)
+        logger.info('设置窗口初始化完毕')
 
     def applyCustomStyleForTheme(self, theme: Theme):
         """根据主题切换浅/深自定义样式，避免深色下文字/背景不匹配"""

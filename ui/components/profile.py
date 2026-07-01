@@ -59,4 +59,4 @@ class ProfileCard(QWidget):
             self.emailLabel.setText("<UNK>@stu.edu.cn")
         else:
             self.emailLabel.setText(state.name+"@stu.edu.cn")
-        self.fluxLabel.setText(f"{state.used:.2f}Mb/{state.total:.2f}Mb")
+        self.fluxLabel.setText(f"{state.used:.2f}MiB/{state.total:.2f}MiB")

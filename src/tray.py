@@ -6,7 +6,8 @@ from src import config
 from ui.windows.settings_window import SettingsWindow
 from src.logging_config import logger
 from ui.components import ProfileCard
-path = os.getcwd()
+
+
 class Tray(QSystemTrayIcon):
     def __init__(self, parent=None,version:str="v1.0.0"):
         super().__init__(parent=parent)
@@ -66,8 +67,8 @@ class Tray(QSystemTrayIcon):
     def quit(self):
         x,y=self.parent().geometry().x(),self.parent().geometry().y()
         mainc = config.CfgParse(os.getcwd()+"/config/main.toml")
-        mainc.write('main','x',x)
-        mainc.write('main','y',y)
+        mainc.write('main','x',x, reload_first=False)
+        mainc.write('main','y',y, reload_first=False)
         # 通知所有插件释放资源
         if hasattr(self.parent(), 'pm') and self.parent().pm is not None:
             self.parent().pm.shutdown()
