@@ -30,7 +30,10 @@ jobs:
 
       - uses: astral-sh/setup-uv@v5
 
-      - run: uv sync
+      - name: Install dependencies
+        env:
+          UV_INDEX_URL: https://pypi.org/simple
+        run: uv sync
 
       - name: Python syntax check
         run: uv run python -m compileall . -q -x '\.venv|__pycache__|output'
@@ -54,6 +57,9 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Install dependencies
+        env:
+          UV_INDEX_URL: https://pypi.org/simple
+        shell: pwsh
         run: uv sync --extra dev
 
       - name: Python syntax check
