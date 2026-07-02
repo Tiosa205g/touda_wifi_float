@@ -151,26 +151,20 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $changelog = Get-Content CHANGELOG.md -Raw
-          # 转义 tag 中的特殊字符（如点号）以用于正则
           $escapedTag = [regex]::Escape($tag)
-          # 提取当前版本 ## [vX.Y.Z] 到下一个 ## [ 或文件末尾之间的内容
           if ($changelog -match "(?sm)^## \[${escapedTag}\].*?(?=\n## \[|\z)") {
             $body = $Matches[0].Trim()
           } else {
-            # fallback: 默认下载说明
-            $body = @"
-### 📦 完全包（含所有插件）
-- 下载 `touda-wifi-float-${{ github.ref_name }}.zip`
-- 解压后运行 `main.exe` 即可
-
-### 🚀 首次使用
-1. 解压到任意目录
-2. 运行 `main.exe`
-3. 在托盘图标右键 → 设置 → 配置 WiFi 账号和 WebVPN
-"@
+            $body = "## 下载说明`n`n"
+            $body += "### 📦 完全包（含所有插件）`n"
+            $body += "- 下载 touda-wifi-float-${{ github.ref_name }}.zip`n"
+            $body += "- 解压后运行 main.exe 即可`n`n"
+            $body += "### 🚀 首次使用`n"
+            $body += "1. 解压到任意目录`n"
+            $body += "2. 运行 main.exe`n"
+            $body += "3. 在托盘图标右键 → 设置 → 配置 WiFi 账号和 WebVPN"
           }
           $body | Out-File -FilePath release_body.md -Encoding utf8
-          Write-Host "Release body written to release_body.md"
 
       - name: Upload to GitHub Release (v* tag)
         if: startsWith(github.ref, 'refs/tags/')
