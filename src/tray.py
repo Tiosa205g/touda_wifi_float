@@ -9,8 +9,9 @@ from ui.components import ProfileCard
 
 
 class Tray(QSystemTrayIcon):
-    def __init__(self, parent=None,version:str="v1.0.0"):
+    def __init__(self, parent=None, version: str = "v1.0.0"):
         super().__init__(parent=parent)
+        self._version = version
         self.setIcon(parent.windowIcon())
         self.setToolTip('Touda WiFi')
 
@@ -50,7 +51,7 @@ class Tray(QSystemTrayIcon):
 
         # 创建新的设置窗口，并在销毁时自动清理引用
         try:
-            self._settings_win = SettingsWindow()
+            self._settings_win = SettingsWindow(version=self._version)
             # 窗口关闭并删除后，自动将引用置空，避免悬空对象
             # 使用弱引用避免 lambda 强捕获 self 导致引用循环
             weak_self = weakref.ref(self)

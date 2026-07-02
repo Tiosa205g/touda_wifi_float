@@ -289,16 +289,61 @@ class UpdateDialog(FramelessDialog):
     def _format_release_body(self, body: str, text_color: str) -> str:
         if not body or not body.strip():
             return "<p style='color:#888;'>暂无更新说明</p>"
+
         import re
         body = body.lstrip('\n\r ')
-        html = body
-        html = re.sub(r'^#{1,3}\s+(.+)$', r'<h3>\1</h3>', html, flags=re.MULTILINE)
-        html = re.sub(r'^- (.+)$', r'<li>\1</li>', html, flags=re.MULTILINE)
-        html = re.sub(r'^\* (.+)$', r'<li>\1</li>', html, flags=re.MULTILINE)
-        html = re.sub(r'```(\w*)\n(.*?)```', r'<pre><code>\2</code></pre>', html, flags=re.DOTALL)
-        html = re.sub(r'`([^`]+)`', r'<code>\1</code>', html)
-        html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', html)
-        html = html.replace('\n', '<br>')
+
+        def _inline(text: str) -> str:
+            text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
+            text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
+            return text
+
+        # 保护代码块，防止内部被解析
+        _codes = []
+        def _save_cb(m):
+            _codes.append(m.group(2))
+            return f"\x00CODE{len(_codes)-1}\x00"
+        body = re.sub(r'```(\w*)\n(.*?)```', _save_cb, body, flags=re.DOTALL)
+
+        lines = body.split('\n')
+        out = []
+        in_ul = False
+
+        for line in lines:
+            s = line.strip()
+
+            # 还原代码块
+            m = re.match(r'\x00CODE(\d+)\x00', s)
+            if m:
+                if in_ul: out.append('</ul>'); in_ul = False
+                out.append(f'<pre><code>{_codes[int(m.group(1))]}</code></pre>')
+                continue
+
+            if not s:
+                if in_ul: out.append('</ul>'); in_ul = False
+                continue
+
+            # 标题
+            m = re.match(r'^(#{1,3})\s+(.+)$', line)
+            if m:
+                if in_ul: out.append('</ul>'); in_ul = False
+                out.append(f'<h{len(m.group(1))}>{_inline(m.group(2))}</h{len(m.group(1))}>')
+                continue
+
+            # 列表项
+            m = re.match(r'^[-*]\s+(.+)$', line)
+            if m:
+                if not in_ul: out.append('<ul>'); in_ul = True
+                out.append(f'<li>{_inline(m.group(1))}</li>')
+                continue
+
+            # 普通段落
+            if in_ul: out.append('</ul>'); in_ul = False
+            out.append(f'<p>{_inline(line)}</p>')
+
+        if in_ul: out.append('</ul>')
+
+        html = '\n'.join(out)
         return (
             f'<html><body style="font-family: -apple-system, Microsoft YaHei, sans-serif; '
             f'line-height: 1.6; color: {text_color};">'

@@ -135,8 +135,9 @@ class _BaseInterface(ScrollArea):
 
 class GeneralInterface(_BaseInterface):
     """常规设置：打开配置文件夹"""
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, version: str = "v1.0.0"):
         super().__init__(parent)
+        self._version = version
         self.mainCfg = CfgParse(_get_main_cfg())
         self._update_thread = None
         self._update_worker = None
@@ -445,17 +446,7 @@ class GeneralInterface(_BaseInterface):
         from src.config import CfgParse
         from PySide6.QtCore import QTimer
 
-        # 从 main.py 读取 VERSION（避免动态导入执行模块级副作用）
-        import re as _re
-        _version_file = os.path.join(os.getcwd(), 'main.py')
-        current_version = 'v0.0.0'
-        try:
-            with open(_version_file, 'r', encoding='utf-8') as _f:
-                _m = _re.search(r'^VERSION\s*=\s*["\']([^"\']+)["\']', _f.read(), _re.MULTILINE)
-                if _m:
-                    current_version = _m.group(1)
-        except Exception:
-            pass
+        current_version = self._version
 
         # 用 list 做闭包容器存储线程结果，避免通过 Signal(object) 传递自定义对象（QueuedConnection 会序列化失败）
         _result = []
@@ -946,8 +937,9 @@ class LinksInterface(_BaseInterface):
 
 
 class SettingsWindow(FluentWindow):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, version: str = "v1.0.0"):
         super().__init__(parent)
+        self._version = version
         ensure_cfg()  # 确保配置目录和文件存在（一次即可）
         self.setWindowTitle('设置 - Touda WiFi')
         self.setFixedSize(1000, 600)  # 固定宽度 1000，高度 600
@@ -984,7 +976,7 @@ class SettingsWindow(FluentWindow):
             self.applyCustomStyleForTheme(Theme.LIGHT)
 
         # pages
-        self.generalInterface = GeneralInterface(self)
+        self.generalInterface = GeneralInterface(self, version=self._version)
         self.generalInterface.setObjectName('generalInterface')
         self.webvpnInterface = WebVpnInterface(self)
         self.webvpnInterface.setObjectName('webvpnInterface')
