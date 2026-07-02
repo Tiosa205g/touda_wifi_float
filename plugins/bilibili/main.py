@@ -122,15 +122,8 @@ class Plugin:
             short_urls.append(label)
             hash_map[label] = x
 
-        from PySide6.QtWidgets import QInputDialog, QDialog
-
-        # 传入父窗口
-        parent = self.api.parent if self.api.parent else None
-
-        item, ok = QInputDialog.getItem(
-            parent, "选择视频地址", "请选择直播源", short_urls, 0, editable=False
-        )
-        if ok and item:
+        item = self.sdk.show_input_list("选择视频地址", "请选择直播源", short_urls)
+        if item:
             raw_url = hash_map[item]
             final_url = (
                 "http://hlsplayer-net-s.webvpn.stu.edu.cn:8118/embed?type=m3u8&src="

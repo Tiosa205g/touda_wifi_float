@@ -883,8 +883,7 @@ class Plugin:
     def _get_adapter_safe(self) -> dict | None:
         adapter = self._get_usable_adapter()
         if not adapter:
-            QMessageBox.warning(None, '未检测到网络',
-                                '未检测到任何网络适配器，请确认网络连接正常。')
+            self.sdk.show_message('未检测到网络', '未检测到任何网络适配器，请确认网络连接正常。')
             self.sdk.logger_error('未检测到网络适配器')
         return adapter
 
@@ -947,12 +946,10 @@ class Plugin:
             return
 
         from qfluentwidgets import Dialog as FluentDialog
-        confirm = FluentDialog(
-            f'确定要将「{adapter["name"]}」恢复为 DHCP 自动获取 IP 吗？',
-            f'当前 IP: {adapter["ip"] or "未设置"}',
-            parent=None
-        )
-        if not confirm.exec():
+        if not self.sdk.show_confirm(
+            '恢复 DHCP',
+            f'确定要将「{adapter["name"]}」恢复为 DHCP 自动获取 IP 吗？\n当前 IP: {adapter["ip"] or "未设置"}'
+        ):
             return
 
         ok, msg = set_dhcp(adapter['name'])

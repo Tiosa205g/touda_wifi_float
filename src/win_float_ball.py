@@ -6,12 +6,13 @@ from functools import partial
 from PySide6.QtCore import QPoint, QTimer, QPropertyAnimation
 from PySide6.QtGui import Qt
 from PySide6.QtWidgets import QApplication
-from qfluentwidgets import TeachingTip, RoundMenu, Action, Dialog, InfoBar
+from qfluentwidgets import TeachingTip, RoundMenu, Action, InfoBar
 from qfluentwidgets import FluentIcon as FIF
 from ui.float_ball import UI_FloatBall
 from ui.windows.drag_window import DragWindow
 from src import touda, config, update_checker
 from src.logging_config import logger
+from ui.components.frameless_dialog import FramelessDialog
 
 
 def _cfg_dir() -> str:
@@ -106,7 +107,7 @@ class FloatBall(DragWindow):
         if self._pending_update is not None:
             raw = self._pending_update
             self._pending_update = None
-            from ui.components.update_dialog import UpdateDialog
+            from ui.components.frameless_dialog import UpdateDialog
             dlg = UpdateDialog(
                 current_version=self._version,
                 latest_tag=raw.tag_name,
@@ -249,14 +250,7 @@ class FloatBall(DragWindow):
         """
         try:
             link = self.webvpn.create_redirect_url("https://webvpn.stu.edu.cn/")
-            w = Dialog(
-                "一键登录链接",
-                "是否在浏览器中打开一键登录链接？",
-                self,
-            )
-            w.yesButton.setText("打开浏览器")
-            w.cancelButton.setText("复制到剪贴板")
-            if w.exec():
+            if FramelessDialog.show_confirm("一键登录链接", "是否在浏览器中打开一键登录链接？", self):
                 webbrowser.open(link)
             else:
                 self.app.clipboard().setText(link)
@@ -287,14 +281,11 @@ class FloatBall(DragWindow):
         self.app.clipboard().setText(twfid)
 
     def open_link_window(self, name: str, link: str, *args):
-        w = Dialog(
+        if FramelessDialog.show_confirm(
             "选择:",
             f"是否使用webvpn打开{name[:70] + ('...' if len(name) > 70 else '')}",
             self,
-        )
-        w.yesButton.setText("是")
-        w.cancelButton.setText("否")
-        if w.exec():
+        ):
             try:
                 self.webvpn.autoLogin()
                 url = touda.get_vpn_url(link)
@@ -439,7 +430,7 @@ class FloatBall(DragWindow):
 
                 # 有新版本：窗口可见直接弹，隐藏时缓存等 showEvent
                 if self.isVisible():
-                    from ui.components.update_dialog import UpdateDialog
+                    from ui.components.frameless_dialog import UpdateDialog
                     dlg = UpdateDialog(
                         current_version=self._version,
                         latest_tag=raw.tag_name,

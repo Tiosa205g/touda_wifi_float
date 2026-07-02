@@ -23,7 +23,6 @@ from qfluentwidgets import (
     StrongBodyLabel,
     InfoBar,
     FluentIcon as FIF,
-    Dialog,
     setTheme,
     Theme,
     isDarkTheme,
@@ -33,6 +32,7 @@ from qfluentwidgets import (
 
 from src.config import CfgParse
 from src.logging_config import logger
+from ui.components.frameless_dialog import FramelessDialog
 
 
 def _get_config_dir() -> str:
@@ -480,7 +480,7 @@ class GeneralInterface(_BaseInterface):
 
             # 有新版本
             desc = raw.summary()
-            from ui.components.update_dialog import UpdateDialog
+            from ui.components.frameless_dialog import UpdateDialog
             dlg = UpdateDialog(
                 current_version=current_version,
                 latest_tag=raw.tag_name,
@@ -728,7 +728,7 @@ class AccountsInterface(_BaseInterface):
             InfoBar.warning(title='不允许删除', content='0 号账户不能删除，只能修改', duration=2000, parent=self)
             return
         base = os.path.basename(self.accounts[idx])
-        if Dialog("确认删除", f"确定删除 {base} ?").exec():
+        if FramelessDialog.show_confirm("确认删除", f"确定删除 {base} ?", self):
             try:
                 os.remove(self.accounts[idx])
                 InfoBar.success(title='已删除', content=base, duration=1200, parent=self)
@@ -901,7 +901,7 @@ class LinksInterface(_BaseInterface):
         data = self._load_all()
         if not t or t not in data or n not in data[t]:
             return
-        if Dialog("确认删除", f"删除 [{t}]/{n} ?").exec():
+        if FramelessDialog.show_confirm("确认删除", f"删除 [{t}]/{n} ?", self):
             del data[t][n]
             if not data[t]:
                 del data[t]
