@@ -7,7 +7,7 @@ from pathlib import Path
 from plugin_sdk import PluginSDK, PluginMenu
 
 PLUGIN_NAME = 'B站直播解析'
-PLUGIN_VERSION = '1.0.0'
+PLUGIN_VERSION = '1.0.1'
 PLUGIN_AUTHOR = 'tiosa'
 PLUGIN_PATH = Path(__file__).parent
 
@@ -88,16 +88,19 @@ class Plugin:
     def parse_bilibili(self):
         if not self.api.webvpn.twfid:
             self.sdk.logger_error("未登录WebVPN，无法使用B站直播解析")
+            self.sdk.show_message("B站直播解析", "未登录WebVPN，无法使用B站直播解析")
             return
 
         # 从剪贴板获取链接
         if self.api.app is None:
             self.sdk.logger_error("无法访问剪贴板")
+            self.sdk.show_message("B站直播解析", "无法访问剪贴板")
             return
         cb = self.api.app.clipboard()
         link = cb.text().strip()
         if not link or ("live" not in link and "bilibili" not in link):
             self.sdk.logger_error("剪贴板内容不是有效的B站直播链接")
+            self.sdk.show_message("B站直播解析", "剪贴板内容不是有效的B站直播链接，请先复制B站直播间链接")
             return
 
         self.sdk.logger_info(f"正在解析: {link}")
@@ -107,11 +110,13 @@ class Plugin:
             self.api.webvpn.autoLogin()
         except Exception as e:
             self.sdk.logger_error(f"WebVPN自动登录失败: {e}")
+            self.sdk.show_message("B站直播解析", f"WebVPN自动登录失败: {e}")
             return
 
         urls = self._get_live_urls(link)
         if not urls:
             self.sdk.logger_error("未获取到直播流地址")
+            self.sdk.show_message("B站直播解析", "未获取到直播流地址，请确认链接是有效的B站直播间")
             return
 
         # 构建简短选择列表
