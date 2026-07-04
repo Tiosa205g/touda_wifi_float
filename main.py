@@ -26,7 +26,7 @@ _fix_working_dir()
 from src.logging_config import logger
 from src.config import CfgParse
 
-VERSION = "v1.4.7.1"
+VERSION = "v1.4.7.2"
 CONFIG_DIR = os.path.join(os.getcwd(), "config")
 MAIN_CFG = os.path.join(CONFIG_DIR, "main.toml")
 LINKS_CFG = os.path.join(CONFIG_DIR, "links.toml")
