@@ -398,7 +398,10 @@ class FloatBall(DragWindow):
             _result = []
 
             def do_check():
-                _result.append(update_checker.check_for_update(self._version))
+                try:
+                    _result.append(update_checker.check_for_update(self._version))
+                except Exception as e:
+                    _result.append(e)
 
             def on_finished():
                 # 线程结束后读取闭包中的结果

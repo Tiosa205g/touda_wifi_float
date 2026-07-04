@@ -452,7 +452,10 @@ class GeneralInterface(_BaseInterface):
         _result = []
 
         def do_check():
-            _result.append(check_for_update(current_version))
+            try:
+                _result.append(check_for_update(current_version))
+            except Exception as e:
+                _result.append(e)
 
         def on_finished():
             self.btnCheckNow.setEnabled(True)

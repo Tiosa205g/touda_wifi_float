@@ -305,12 +305,12 @@ class webvpn(QObject):
             "https://webvpn.stu.edu.cn/por/conf.csp?apiversion=1", headers=self.header
         )
         if r.status_code == 200:
-            ret = (
-                "unexpected user service" not in r.content.decode()
-            )  # 检测是否是在登录页面
-            if not ret:
+            data = r.content.decode()
+            if "unexpected user service" in data or len(data) < 50:
+                # logger.info(f"data:{data}")
                 self._clear_twfid()
-            return ret
+                return False
+            return True
         else:
             self._clear_twfid()
             return False
@@ -582,8 +582,11 @@ class wifi(QObject):
                 state.used = 0
                 state.name = self.name
             else:
-                state.total, state.used, self.name = get_data(ret)
+                state.total, state.used, parsed_name = get_data(ret)
                 state.state = "已登录"
+                # 只有解析出有效用户名才覆盖 self.name，避免 <UNK> 污染登录凭据
+                if parsed_name and parsed_name != "<UNK>":
+                    self.name = parsed_name
                 state.name = self.name
         else:
             state.state = "未登录"

@@ -80,6 +80,11 @@ class UpdateInfo:
         return ""
 
 
+class UpdateCheckError(Exception):
+    """检查更新时的网络或服务器错误"""
+    pass
+
+
 def check_for_update(current_version: str) -> Optional[UpdateInfo]:
     """查询 GitHub Releases API 获取最新版本信息
 
@@ -88,46 +93,47 @@ def check_for_update(current_version: str) -> Optional[UpdateInfo]:
 
     Returns:
         有新版本时返回 UpdateInfo，否则返回 None
-        网络异常或解析失败也返回 None
+        网络/HTTP 错误时抛出 UpdateCheckError（Workder 会捕获并作为返回值传递）
+
+    Raises:
+        UpdateCheckError: 网络异常或服务器返回非 200 状态码
     """
+    logger.info(f"检查更新: 当前版本 {current_version}")
     try:
-        logger.info(f"检查更新: 当前版本 {current_version}")
         resp = requests.get(RELEASES_API, timeout=REQUEST_TIMEOUT, headers={
             "Accept": "application/vnd.github.v3+json",
             "User-Agent": "ToudaWiFiFloat/1.0",
         })
-
-        if resp.status_code != 200:
-            logger.warning(f"检查更新失败: HTTP {resp.status_code}")
-            return None
-
-        data = resp.json()
-        tag_name = data.get("tag_name", "")
-        if not tag_name:
-            logger.warning("检查更新失败: 响应中无 tag_name")
-            return None
-
-        # 版本比较
-        result = compare_versions(current_version, tag_name)
-        if result >= 0:
-            logger.info(f"已是最新版本: {current_version}")
-            return None
-
-        info = UpdateInfo(
-            tag_name=tag_name,
-            html_url=data.get("html_url", f"https://github.com/{GITHUB_REPO}/releases/latest"),
-            body=data.get("body", ""),
-            published_at=data.get("published_at", ""),
-        )
-        logger.info(f"发现新版本: {tag_name}")
-        return info
-
-    except requests.exceptions.Timeout:
-        logger.warning("检查更新超时")
-        return None
     except requests.exceptions.RequestException as e:
         logger.warning(f"检查更新网络异常: {e}")
-        return None
+        raise UpdateCheckError(f"网络异常: {e}") from e
+
+    if resp.status_code != 200:
+        logger.warning(f"检查更新失败: HTTP {resp.status_code}")
+        raise UpdateCheckError(f"服务器返回状态码 {resp.status_code}")
+
+    try:
+        data = resp.json()
     except Exception as e:
-        logger.exception(f"检查更新异常: {e}")
+        logger.exception(f"检查更新: JSON 解析失败")
+        raise UpdateCheckError("响应解析失败") from e
+
+    tag_name = data.get("tag_name", "")
+    if not tag_name:
+        logger.warning("检查更新失败: 响应中无 tag_name")
         return None
+
+    # 版本比较
+    result = compare_versions(current_version, tag_name)
+    if result >= 0:
+        logger.info(f"已是最新版本: {current_version}")
+        return None
+
+    info = UpdateInfo(
+        tag_name=tag_name,
+        html_url=data.get("html_url", f"https://github.com/{GITHUB_REPO}/releases/latest"),
+        body=data.get("body", ""),
+        published_at=data.get("published_at", ""),
+    )
+    logger.info(f"发现新版本: {tag_name}")
+    return info
