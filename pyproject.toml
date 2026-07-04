@@ -7,7 +7,6 @@ requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4>=4.13",
     "lxml>=6.1.0",
-    "mini-racer>=0.14.1",
     "pluggy>=1.6.0",
     "pyside6>=6.9",
     "pyside6-fluent-widgets>=1.8",

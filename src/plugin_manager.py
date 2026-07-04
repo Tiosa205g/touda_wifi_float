@@ -94,18 +94,37 @@ class Manager:
         load_all_plugins(plugin_root="./plugins", pm=self.pm)
 
         # 逐一启动插件，启动失败则卸载并从列表移除
+        # 每个插件独立 try-except，避免一个插件加载失败导致所有插件都无法显示
         self.plugins = []
         for plg in self.pm.get_plugins():
-            if plg.start(self.api):
-                self.plugins.append({
-                    'name': plg.get_name(),
-                    'description': plg.get_description(),
-                    'object': plg,
-                })
-            else:
-                # start 返回 False → 卸载以防止残留注册
-                plg.on_disable()
-                self.pm.unregister(plg)
+            try:
+                if plg.start(self.api):
+                    try:
+                        name = plg.get_name()
+                        description = plg.get_description()
+                    except Exception:
+                        logger.exception(f"插件 {plg} 的 get_name/get_description 异常，跳过")
+                        name = "未知插件"
+                        description = ""
+                    self.plugins.append({
+                        'name': name,
+                        'description': description,
+                        'object': plg,
+                    })
+                else:
+                    # start 返回 False → 卸载以防止残留注册
+                    try:
+                        plg.on_disable()
+                    except Exception:
+                        logger.exception(f"插件 {plg} 的 on_disable 异常")
+                    self.pm.unregister(plg)
+            except Exception as e:
+                logger.exception(f"插件 {plg} 的 start 方法异常: {e}")
+                # 尝试卸载，但不阻塞其余插件
+                try:
+                    self.pm.unregister(plg)
+                except Exception:
+                    pass
         logger.info(f'已加载的有效插件列表:{self.plugins}')
     def shutdown(self):
         """程序退出时调用所有插件的 on_exit 钩子，释放插件持有的资源"""
@@ -118,7 +137,10 @@ class Manager:
                     logger.exception(f"插件 {plg.get('name', '?')} on_exit 异常")
 
     def open_plg_setting(self, plg):
-        plg.on_setting()
+        try:
+            plg.on_setting()
+        except Exception:
+            logger.exception(f"插件 {plg} 的 on_setting 异常")
     def is_valid_func(self,plg,func_name:str)->bool:
         return callable(getattr(plg,func_name,None))
 

@@ -23,7 +23,6 @@ MAIN_COVERED = {
     "requests",
     "lxml",
     "pyotp",
-    "py_mini_racer",
     "urllib3",
     "idna",
 }
