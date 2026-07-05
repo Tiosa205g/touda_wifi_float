@@ -89,15 +89,10 @@ if __name__ == "__main__":
 
     init_config()
 
-    # ── 管理员启动检查 ──
-    # 从注册表启动时带 --auto-start 标记，跳过提权，否则开机弹 UAC 没人点
-    is_auto_start = '--auto-start' in argv
-    if is_auto_start:
-        logger.info("开机自启模式：跳过管理员提权检查")
-
+    # ── 管理员启动检查（开机自启也会弹出 UAC，确保真正以管理员权限运行） ──
     cfg = CfgParse(MAIN_CFG)
     need_admin = str(cfg.get('startup', 'run_as_admin', False)).lower() == 'true'
-    if need_admin and not _is_admin() and not is_auto_start and not _is_source():
+    if need_admin and not _is_admin() and not _is_source():
         logger.info("检测到管理员启动配置，正在请求提权…")
         _request_admin_restart()
 

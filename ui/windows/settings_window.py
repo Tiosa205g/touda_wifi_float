@@ -304,8 +304,7 @@ class GeneralInterface(_BaseInterface):
             )
             val, _ = winreg.QueryValueEx(key, "ToudaWiFi")
             winreg.CloseKey(key)
-            # 注册表值可能带参数：C:\path\main.exe --auto-start
-            # 或带引号："python.exe" "main.py" --auto-start
+            # 或带引号："python.exe" "main.py"
             # 需要提取出真正的可执行文件路径
             if val.startswith('"'):
                 exe_path = val.split('"')[1]
@@ -344,7 +343,7 @@ class GeneralInterface(_BaseInterface):
                 0, winreg.KEY_SET_VALUE
             )
             if checked:
-                exe_path = self._get_app_exe_path() + " --auto-start"
+                exe_path = self._get_app_exe_path()
                 winreg.SetValueEx(key, "ToudaWiFi", 0, winreg.REG_SZ, exe_path)
                 InfoBar.success(title='已开启', content='开机自启已启用', duration=1500, parent=self)
             else:

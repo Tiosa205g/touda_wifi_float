@@ -3,13 +3,12 @@ import re
 import webbrowser
 import base64
 from functools import partial
-from PySide6.QtCore import QPoint, QTimer, QPropertyAnimation
+from PySide6.QtCore import QPoint, QSize, QTimer, QPropertyAnimation
 from PySide6.QtGui import Qt
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QWidget
 from qfluentwidgets import TeachingTip, RoundMenu, Action, InfoBar
 from qfluentwidgets import FluentIcon as FIF
 from ui.float_ball import UI_FloatBall
-from ui.windows.drag_window import DragWindow
 from src import touda, config, update_checker
 from src.logging_config import logger
 from ui.components.frameless_dialog import FramelessDialog
@@ -41,17 +40,31 @@ class MyRoundMenu(RoundMenu):
             self._hideMenu(True)
 
 
-class FloatBall(DragWindow):
+class FloatBall(QWidget):
+    __is_dragging: bool = False
+    __start_drag_position: QPoint = QPoint()
+    __leftScreen = True
+    __screen_size = QSize()
+
     def __init__(self, screen_size, app: QApplication, version: str = "v0.0.0"):
         super().__init__()
+        self.setObjectName("FloatBall")
         self.app = app
         self._version = version
+        self._pending_update = None  # 待显示的更新信息（需在 setupUI → showEvent 前初始化）
+
+        # 窗口标志和透明背景必须在 show() 之前设置
+        self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        # 设置为纯透明 widget，避免任何 DWM 框架残留
+        self.setStyleSheet("#FloatBall { background: transparent; }")
+
         self.ui = UI_FloatBall()
         self.ui.setupUI(self)
         self.setFixedSize(self.ui.waterBall.size())
-        self.setResizeEnabled(False)
+        self.__screen_size = screen_size
+        self.__leftScreen = False
 
-        self.setCanLeftScreen(False, screen_size=screen_size)
         self.ui.waterBall.setContextMenuPolicy(Qt.CustomContextMenu)
         self.ui.waterBall.customContextMenuRequested.connect(self.waterBall_menu)
 
@@ -86,11 +99,44 @@ class FloatBall(DragWindow):
         self._switch_worker = None  # 账号切换 Worker 引用
         self._update_thread = None  # 检查更新后台线程引用
         self._update_worker = None  # 检查更新 Worker 引用
-        self._pending_update = None  # 待显示的更新信息（静默启动时缓存）
+        # 已在上方 setupUI 前初始化
         x, y = self.main_cfg.get("main", "x", 0), self.main_cfg.get(
             "main", "y", 0
         )  # 设置初始位置为上一次关闭位置
         self.move(x, y)
+
+        # 所有初始化完成后再显示窗口（确保窗口标志和透明背景已设置）
+        self.show()
+
+    # ── 拖拽支持（替代 DragWindow） ──
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.__is_dragging = True
+            self.__start_drag_position = event.globalPos() - self.pos()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if self.__is_dragging:
+            pos = event.globalPos() - self.__start_drag_position
+            if not self.__leftScreen:
+                width = self.__screen_size.width()
+                height = self.__screen_size.height()
+                geo = self.geometry()
+                if pos.x() > width - geo.width():
+                    pos.setX(width - geo.width())
+                elif pos.x() < 0:
+                    pos.setX(0)
+                if pos.y() > height - geo.height():
+                    pos.setY(height - geo.height())
+                elif pos.y() < 0:
+                    pos.setY(0)
+            self.move(pos)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if self.__is_dragging:
+            self.__is_dragging = False
+            event.accept()
 
     def hideEvent(self, event):
         """窗口隐藏时暂停波浪动画，减少 GPU/CPU 占用（定时器保持运行，保证网络认证状态）"""
