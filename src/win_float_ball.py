@@ -230,21 +230,38 @@ class FloatBall(QWidget):
         menu.addMenu(webvpnMenu)
         menu.addMenu(accountMenu)
 
-        try:
-            if len(self.pm.plugins) > 0:
-                for plg in self.pm.plugins:
+        if len(self.pm.plugins) > 0:
+            for plg in self.pm.plugins:
+                try:
                     p = plg["object"]
                     if self.pm.is_valid_func(p, "get_menu"):
-                        plg_actions = [
-                            Action(text=a["function"], triggered=a["object"])
-                            for a in p.get_menu()
-                        ]
-                        sub_menu = MyRoundMenu(plg["name"], parent=pluginMenu)
-                        sub_menu.addActions(plg_actions)
-                        pluginMenu.addMenu(sub_menu)
-                menu.addMenu(pluginMenu)
-        except Exception:
-            logger.exception("加载插件菜单失败")
+                        plg_actions = []
+                        plg_menu_items = p.get_menu()
+                        for a in plg_menu_items:
+                            try:
+                                if not callable(a.get("object")):
+                                    # 非可调用对象视为分隔线或暂不可用项，跳过
+                                    continue
+                                plg_actions.append(
+                                    Action(text=a["function"], triggered=a["object"])
+                                )
+                            except Exception:
+                                logger.exception(
+                                    f"插件 [{plg.get('name', '?')}] 菜单项 [{a.get('function', '?')}] 创建失败"
+                                )
+                        if not plg_actions:
+                            logger.warning(
+                                f"插件 [{plg.get('name', '?')}] 没有可用的菜单项"
+                            )
+                        else:
+                            sub_menu = MyRoundMenu(plg["name"], parent=pluginMenu)
+                            sub_menu.addActions(plg_actions)
+                            pluginMenu.addMenu(sub_menu)
+                except Exception:
+                    logger.exception(
+                        f"加载插件 [{plg.get('name', '?')}] 菜单失败"
+                    )
+            menu.addMenu(pluginMenu)
 
         menu.addSeparator()
         menu.addAction(

@@ -1,11 +1,10 @@
 # 汕大校园网工具-悬浮球版 🌊
 
 <div align="center">
-
 ![Version](https://img.shields.io/badge/version-v1.4.7.2-blue)
 ![Python](https://img.shields.io/badge/python-3.12+-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
-![Build](https://img.shields.io/github/actions/workflow/status/Tiosa205g/touda_wifi_float/build.yaml?branch=main)
+![Build](https://img.shields.io/github/actions/workflow/status/Tiosa205g/touda_wifi_float/.github/workflows/build-release.yml?branch=main)
 
 一款为汕头大学校园网设计的桌面悬浮球工具，集成校园网登录、WebVPN 访问、流量监控与插件扩展等功能。
 
@@ -167,7 +166,7 @@ mystu = "https://my.stu.edu.cn/"
 
 推荐通过设置界面图形化配置：
 
-1. 右键悬浮球 → **设置** → **WebVPN** 选项卡
+1. 右键托盘 → **设置** → **WebVPN** 选项卡
 2. 填入用户名（学号）、密码、数盾 OTP 密钥
 3. 点击保存，配置自动写入文件
 
