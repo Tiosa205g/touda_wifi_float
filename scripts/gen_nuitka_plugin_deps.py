@@ -3,10 +3,12 @@
 Usage:
     uv run python scripts/gen_nuitka_plugin_deps.py
 
-Output (stdout): one --include-package=xxx per line
+Output (stdout): one Nuitka include flag per line — packages as
+    --include-package=xxx, single-file modules as --include-module=xxx.
 """
 
 import ast
+import importlib.util
 import os
 from pathlib import Path
 
@@ -57,6 +59,23 @@ def scan_plugin_imports(plugin_dir: Path) -> set[str]:
     return imports
 
 
+def _is_package(mod: str) -> bool:
+    """判断完整点分名指向的是「包」还是「单个模块文件」。
+
+    Nuitka 对包必须用 --include-package（递归包含），对单文件模块才用
+    --include-module（否则包内子模块不会被冻结进 exe，运行时会报
+    No module named 'xxx'）。这里用 importlib 的 spec 判定：
+    submodule_search_locations 非空即为包。
+    """
+    try:
+        spec = importlib.util.find_spec(mod)
+    except (ImportError, ValueError, ModuleNotFoundError):
+        return False
+    if spec is None:
+        return False
+    return spec.submodule_search_locations is not None
+
+
 def main():
     plugin_imports = scan_plugin_imports(PLUGIN_DIR)
 
@@ -70,10 +89,13 @@ def main():
         extra.add(mod)
 
     # 插件运行时通过 importlib 动态加载，Nuitka 不分析这些外部文件，因此插件
-    # 用到的「所有」模块（含标准库子包）都必须显式打包。传入完整点分模块名，
-    # Nuitka 会递归包含该子包及其全部子模块（例如 concurrent.futures → 整包）。
+    # 用到的「所有」模块都必须显式打包。包用 --include-package（递归冻结整包
+    # 及其子模块，例如 concurrent.futures / bs4），单文件模块用 --include-module。
     for pkg in sorted(extra):
-        print(f"--include-module={pkg}")
+        if _is_package(pkg):
+            print(f"--include-package={pkg}")
+        else:
+            print(f"--include-module={pkg}")
 
 
 if __name__ == "__main__":

@@ -316,7 +316,6 @@ class Plugin:  # 类名必须为 Plugin，不可修改
 touda_wifi_float/
 ├── main.py                 # 程序入口
 ├── pyproject.toml          # 项目配置与依赖声明（uv）
-├── compile.bat             # 编译脚本（Nuitka）
 ├── config/                 # 配置文件目录
 ├── src/                    # 核心功能模块
 │   ├── touda.py            # 校园网/WebVPN 核心逻辑
@@ -340,8 +339,7 @@ touda_wifi_float/
 │   └── 切换ip/             # 静态地址切换插件
 ├── res/                    # 资源文件
 │   └── ico/                # 图标资源
-├── output/                 # 编译输出目录
-└── .github/workflows/      # CI/CD 工作流
+└── .github/workflows/      # CI/CD 工作流（Nuitka 自动构建）
 ```
 
 ### 技术栈
@@ -355,36 +353,24 @@ touda_wifi_float/
 | 插件系统 | pluggy |
 | Windows API | pywin32 |
 | 包管理 | [uv](https://docs.astral.sh/uv/) |
-| 打包工具 | Nuitka（支持 GitHub Actions 自动构建） |
+| 打包工具 | Nuitka（GitHub Actions 自动构建） |
 
-### 编译为可执行文件
+### 编译为可执行文件（GitHub Actions）
 
-#### 使用 GitHub Actions（推荐）
-
-推送 `v*` 格式的 tag 即可自动触发构建工作流，编译产物将作为 Release 附件发布：
+推送 `v*` 格式的 tag 即可自动触发 `build-release.yml` 构建工作流，使用 Nuitka 编译产物并作为 Release 附件发布：
 
 ```bash
 git tag v1.x.x
 git push origin v1.x.x
 ```
 
-#### 本地使用 Nuitka
+构建流程说明：
 
-```bash
-# 1）安装依赖（含 nuitka）
-uv sync --extra dev
-# 2）运行打包脚本
-compile.bat
-# 或直接使用 uv run：
-uv run nuitka --onefile --standalone --mingw64 --output-dir=output --windows-disable-console --windows-icon-from-ico=res/ico/favicon.ico --enable-plugin=pyside6 --include-qt-plugins=sensible,styles --include-data-dir=res/ico=res/ico --follow-imports main.py
-```
+- 触发方式：推送 `v*` tag（或手动 `workflow_dispatch` 上传制品）
+- 依赖探测：构建前运行 `scripts/gen_nuitka_plugin_deps.py`，自动扫描 `plugins/` 下插件的 import，将插件运行时动态加载所需的模块（含标准库子包如 `concurrent.futures`）以 `--include-package` / `--include-module` 显式打进 exe
+- 产物：打包 `main.exe` + `res/` + 全部插件目录（不含 `example` 示例插件）为压缩包发布
 
-说明：
-
-- 脚本默认使用 `--onefile --standalone --mingw64` 打包，并启用 PySide6 插件
-- 会将 `res/ico/*.ico` 资源打包；插件目录 `plugins/` 也会被包含
-- UPX 可选，如需启用，请确保本机已安装并在脚本中配置路径或加入 PATH
-- Nuitka 可能需要编译器（MSVC 或 MinGW-w64），按提示安装或让 Nuitka 自动下载
+> 提示：插件通过 `importlib` 在运行时动态加载，Nuitka 静态分析无法覆盖，因此插件依赖必须由上述脚本显式声明，否则打包后运行会报 `No module named 'xxx'`。
 
 ## 🐛 常见问题
 
