@@ -1,6 +1,8 @@
-# 汕大校园网工具-悬浮球版 🌊
 
 <div align="center">
+
+# 汕大校园网工具
+
 ![Version](https://img.shields.io/badge/version-v1.4.7.2-blue)
 ![Python](https://img.shields.io/badge/python-3.12+-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)

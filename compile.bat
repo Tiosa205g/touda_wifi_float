@@ -17,6 +17,16 @@ if not exist "%VENV_DIR%\Scripts\activate.bat" (
     exit /b 1
 )
 
+:: 1.5 Generate Nuitka include flags for plugin-only imports (e.g. concurrent.futures / bs4)
+::      插件在运行时才被 importlib 加载，Nuitka 不分析这些文件，必须显式打包
+call "%VENV_DIR%\Scripts\python" scripts\gen_nuitka_plugin_deps.py > nuitka_plugin_deps.txt 2>nul
+set "PLUGIN_DEPS="
+if exist nuitka_plugin_deps.txt (
+    for /f "usebackq delims=" %%a in ("nuitka_plugin_deps.txt") do (
+        call set "PLUGIN_DEPS=%%PLUGIN_DEPS%% %%a"
+    )
+)
+
 :: 2. Check if main script exists
 if not exist "%SCRIPT_NAME%" (
     echo Error: Main script "%SCRIPT_NAME%" not found
@@ -59,6 +69,7 @@ echo Starting Nuitka compilation for "%SCRIPT_NAME%"...
     --standalone ^
     --output-dir="%OUTPUT_DIR%" ^
     --include-package="%PLUGINS_PATH%" ^
+    !PLUGIN_DEPS! ^
     --windows-console-mode=disable ^
     !ICON_PARAM! ^
     !UPX_PARAM! ^
