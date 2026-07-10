@@ -8,7 +8,6 @@ Output (stdout): one --include-package=xxx per line
 
 import ast
 import os
-import sys
 from pathlib import Path
 
 PLUGIN_DIR = Path(__file__).resolve().parent.parent / "plugins"
@@ -26,11 +25,6 @@ MAIN_COVERED = {
     "urllib3",
     "idna",
 }
-
-
-def get_stdlib() -> frozenset[str]:
-    """Return frozenset of stdlib module names (Python 3.10+)."""
-    return sys.stdlib_module_names
 
 
 def scan_plugin_imports(plugin_dir: Path) -> set[str]:
@@ -62,20 +56,24 @@ def scan_plugin_imports(plugin_dir: Path) -> set[str]:
 
 
 def main():
-    stdlib = get_stdlib()
-
     plugin_imports = scan_plugin_imports(PLUGIN_DIR)
 
-    # 只保留插件特有、不在 stdlib 且不在主程序覆盖范围里的包
+    # 插件在运行时通过 importlib 动态加载，Nuitka 冻结时不会分析这些外部
+    # 文件，只会打包从 main.py 可达的模块。因此插件用到的「所有」模块（含
+    # 标准库）都必须显式让 Nuitka 打包进来——不能像以前那样减去 stdlib，
+    # 否则 concurrent.futures / ctypes 这类仅被插件用到的标准库模块不会被
+    # 冻结，运行时就会报 "No module named 'concurrent'"。
+    # 主程序已静态引入的第三方包保留在 MAIN_COVERED 中避免重复；src 由主
+    # 程序的 --follow-imports 覆盖；plugin_sdk 是运行时松散文件，不进冻结包。
     extra = (
         plugin_imports
-        - stdlib
         - MAIN_COVERED
-        - {"plugin_sdk"}  # 项目内模块，不需要 include-package
+        - {"plugin_sdk", "src"}
     )
 
+    # --include-module 对标准库模块和第三方包都适用，且对包会递归包含子模块
     for pkg in sorted(extra):
-        print(f"--include-package={pkg}")
+        print(f"--include-module={pkg}")
 
 
 if __name__ == "__main__":
