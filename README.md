@@ -3,7 +3,7 @@
 
 # 汕大校园网工具
 
-![Version](https://img.shields.io/badge/version-v1.4.7.2-blue)
+![Version](https://img.shields.io/badge/version-v1.4.7.3-blue)
 ![Python](https://img.shields.io/badge/python-3.12+-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 ![Build](https://img.shields.io/github/actions/workflow/status/Tiosa205g/touda_wifi_float/.github/workflows/build-release.yml?branch=main)

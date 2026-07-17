@@ -103,6 +103,21 @@ class FloatBall(QWidget):
         x, y = self.main_cfg.get("main", "x", 0), self.main_cfg.get(
             "main", "y", 0
         )  # 设置初始位置为上一次关闭位置
+
+        # 验证坐标在任意可用屏幕范围内，防止副屏移除后窗口显示到不可见区域
+        from PySide6.QtCore import QRect
+        from PySide6.QtGui import QGuiApplication
+
+        win_rect = QRect(x, y, self.width(), self.height())
+        if not any(screen.geometry().intersects(win_rect) for screen in QGuiApplication.screens()):
+            primary_geo = QGuiApplication.primaryScreen().availableGeometry()
+            x = primary_geo.x() + (primary_geo.width() - self.width()) // 2
+            y = primary_geo.y() + (primary_geo.height() - self.height()) // 2
+            logger.info(
+                "上次关闭位置(%d, %d)不在当前屏幕范围内，已自动居中到主屏(%d, %d)",
+                win_rect.x(), win_rect.y(), x, y
+            )
+
         self.move(x, y)
 
         # 所有初始化完成后再显示窗口（确保窗口标志和透明背景已设置）
