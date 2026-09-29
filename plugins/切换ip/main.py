@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QWidget, QFrame, QSizePolicy,
-    QScrollArea,
+    QScrollArea, QGraphicsDropShadowEffect, QApplication,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QObject, QTimer, QPoint
 from PySide6.QtGui import QFont, QColor, QMouseEvent
@@ -69,6 +69,73 @@ def _run_cmd(cmd: list[str]) -> str:
 def is_admin() -> bool:
     try:
         return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except Exception:
+        return False
+
+
+def _toast_parent():
+    """为 InfoBar 选择宿主窗口
+
+    InfoBar 不传 parent 会退化成带原生标题栏的独立弹窗（Qt 默认居中显示）；
+    挂到悬浮球上又会被 100x100 的窗口裁剪显示不全。
+    因此只认普通窗口：活动窗口 → 任意可见顶层窗口（悬浮球除外）。
+    """
+    try:
+        w = QApplication.activeWindow()
+        if w and w.objectName() != 'FloatBall':
+            return w
+        for top in QApplication.topLevelWidgets():
+            if (top.isVisible() and top.isWindow()
+                    and not top.isMinimized()
+                    and top.objectName() != 'FloatBall'):
+                return top
+    except Exception:
+        pass
+    return None
+
+
+def _toast(kind: str, title: str, content: str, duration: int = 3000, parent=None):
+    """统一 toast 入口
+
+    无窗口宿主时挂到库提供的桌面视图（全屏透明覆盖层，toast 显示在屏幕右上角，
+    宽度充足不会被裁剪），并移除该覆盖层在 Win11 上的系统边框。
+    连桌面视图都不可用时降级为日志，绝不弹出独立原生弹窗。
+    """
+    host = parent if isinstance(parent, QWidget) else _toast_parent()
+    if host is None:
+        try:
+            from ui.components.frameless_dialog import _remove_native_border
+            view = InfoBar.desktopView()
+            _remove_native_border(view)
+            host = view
+        except Exception:
+            host = None
+    if host is None:
+        logger.error(f'[切换静态IP] {title}: {content}')
+        return
+    try:
+        getattr(InfoBar, kind)(title=title, content=content, duration=duration, parent=host)
+    except Exception:
+        logger.error(f'[切换静态IP] {title}: {content}')
+
+
+def _request_admin_restart() -> bool:
+    """以管理员身份重启程序（弹 UAC），成功发起则退出当前进程"""
+    try:
+        if sys.argv[0].endswith('.py'):
+            exe = sys.executable
+            params = ' '.join([f'"{Path(sys.argv[0]).resolve()}"'] +
+                              [f'"{a}"' for a in sys.argv[1:]])
+        else:
+            exe = sys.executable
+            params = ' '.join(f'"{a}"' for a in sys.argv[1:])
+        ret = ctypes.windll.shell32.ShellExecuteW(
+            None, 'runas', exe, params, None, 1)
+        if ret <= 32:  # 用户取消 UAC 或启动失败
+            return False
+        from PySide6.QtCore import QCoreApplication
+        QCoreApplication.quit()
+        return True
     except Exception:
         return False
 
@@ -441,29 +508,36 @@ def _card_style() -> str:
 # 无边框对话框基类
 # =========================================================================
 class _FramelessDialog(QDialog):
-    """插件内无边框对话框基类 — 圆角背景、标题栏、拖拽"""
+    """插件内无边框对话框基类 — 圆角背景、投影、标题栏、拖拽、智能定位"""
 
     def __init__(self, parent=None, title=''):
         super().__init__(parent)
         self._is_dragging = False
         self._drag_start = QPoint()
+        self._placed = False
 
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
 
-        # ── 根布局 ──
+        # ── 根布局：四周留出阴影绘制空间 ──
         root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
+        root.setContentsMargins(16, 10, 16, 16)
         root.setSpacing(0)
 
         # ── 外层容器（圆角 + 背景） ──
         self._outer = QWidget(self)
         self._outer.setObjectName("plgFdOuter")
+        # 柔和投影：无边框窗口没有系统阴影，避免"贴"在屏幕上的突兀感
+        shadow = QGraphicsDropShadowEffect(self._outer)
+        shadow.setBlurRadius(32)
+        shadow.setOffset(0, 8)
+        shadow.setColor(QColor(0, 0, 0, 100))
+        self._outer.setGraphicsEffect(shadow)
         self._outerLayout = QVBoxLayout(self._outer)
         self._outerLayout.setContentsMargins(0, 0, 0, 0)
         self._outerLayout.setSpacing(0)
-        root.addWidget(self._outer)
+        root.addWidget(self._outer, 1)
 
         # ── 标题栏 ──
         self._build_title_bar(title)
@@ -518,6 +592,7 @@ class _FramelessDialog(QDialog):
         tb.addWidget(close_btn)
 
         self._outerLayout.addWidget(bar)
+        self._title_bar = bar
 
     def _refresh_theme(self):
         bg, text, sec, border = _get_theme_colors()
@@ -545,12 +620,29 @@ class _FramelessDialog(QDialog):
                 w.deleteLater()
         self._content_layout.addWidget(widget, stretch)
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        # 移除 Win11 默认系统边框 + 首次显示时智能定位（父窗口中央 / 鼠标位置）
+        try:
+            from ui.components.frameless_dialog import (
+                _remove_native_border, _position_dialog,
+            )
+            _remove_native_border(self)
+            if not self._placed:
+                self._placed = True
+                _position_dialog(self, self.parent())
+        except Exception:
+            pass
+
     # ── 拖拽支持 ──
     def mousePressEvent(self, event: QMouseEvent):
-        if event.button() == Qt.LeftButton and event.position().y() <= 44:
-            self._is_dragging = True
-            self._drag_start = event.globalPosition().toPoint() - self.pos()
-            event.accept()
+        # 按下点落在标题栏内才开始拖拽（换算到 _outer 坐标，根布局有阴影留白）
+        if event.button() == Qt.LeftButton and getattr(self, '_title_bar', None) is not None:
+            pos_in_outer = self._outer.mapFrom(self, event.position().toPoint())
+            if self._title_bar.geometry().contains(pos_in_outer):
+                self._is_dragging = True
+                self._drag_start = event.globalPosition().toPoint() - self.pos()
+                event.accept()
 
     def mouseMoveEvent(self, event: QMouseEvent):
         if self._is_dragging:
@@ -611,7 +703,7 @@ class _AdapterCard(CardWidget):
 class NetworkInfoDialog(_FramelessDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent, title='所有网络适配器')
-        self.resize(540, 420)
+        self.resize(572, 446)
 
         adapters = get_adapters()
 
@@ -661,9 +753,10 @@ class NetworkInfoDialog(_FramelessDialog):
 # 适配器选择对话框
 # =========================================================================
 class AdapterSelectDialog(_FramelessDialog):
-    def __init__(self, title: str = '选择适配器', parent=None):
+    def __init__(self, title: str = '选择适配器', tip: str = '将扫描该适配器所在网段的可用 IP',
+                 ok_text: str = '开始扫描', ok_icon=None, parent=None):
         super().__init__(parent=parent, title=title)
-        self.resize(420, 200)
+        self.resize(452, 226)
 
         self.combo = ComboBox()
         self._adapters = [a for a in get_adapters() if a['ip']]
@@ -685,16 +778,16 @@ class AdapterSelectDialog(_FramelessDialog):
 
         self._content_layout.addWidget(self.combo)
 
-        tip = BodyLabel('将扫描该适配器所在网段的可用 IP')
-        tip.setStyleSheet(f'color: {_text_secondary()};')
-        self._content_layout.addWidget(tip)
+        tip_label = BodyLabel(tip)
+        tip_label.setStyleSheet(f'color: {_text_secondary()};')
+        self._content_layout.addWidget(tip_label)
 
         self._content_layout.addStretch()
 
         btn_layout = QHBoxLayout()
         btn_cancel = PushButton('取消')
         btn_cancel.clicked.connect(self.reject)
-        btn_ok = PrimaryPushButton(FIF.SEARCH, '开始扫描')
+        btn_ok = PrimaryPushButton(ok_icon or FIF.SEARCH, ok_text)
         btn_ok.clicked.connect(self.accept)
         btn_layout.addStretch()
         btn_layout.addWidget(btn_cancel)
@@ -706,6 +799,69 @@ class AdapterSelectDialog(_FramelessDialog):
         if 0 <= idx < len(self._adapters):
             return self._adapters[idx]
         return None
+
+
+# =========================================================================
+# 管理员权限提示对话框
+# =========================================================================
+class AdminRequiredDialog(_FramelessDialog):
+    """需要管理员权限 — 说明原因并提供一键提权重启"""
+
+    def __init__(self, reason: str = '修改 IP / DHCP 设置', parent=None):
+        super().__init__(parent=parent, title='需要管理员权限')
+        self.resize(432, 296)
+
+        card = CardWidget()
+        card.setBorderRadius(8)
+        card.setStyleSheet(_card_style())
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(20, 20, 20, 20)
+        lay.setSpacing(10)
+
+        icon = BodyLabel('🛡️')
+        icon.setStyleSheet('font-size: 32px; background: transparent;')
+        icon.setAlignment(Qt.AlignCenter)
+        lay.addWidget(icon)
+
+        msg = BodyLabel(f'{reason}需要管理员权限，\n当前程序未以管理员身份运行。')
+        msg.setWordWrap(True)
+        msg.setAlignment(Qt.AlignCenter)
+        msg.setStyleSheet(f'color: {_text_primary()}; font-size: 13px; background: transparent;')
+        lay.addWidget(msg)
+
+        note = CaptionLabel('可点击下方按钮一键重启并授权，也可手动以管理员身份运行程序')
+        note.setWordWrap(True)
+        note.setAlignment(Qt.AlignCenter)
+        note.setStyleSheet(f'color: {_text_secondary()}; background: transparent;')
+        lay.addWidget(note)
+
+        self._content_layout.addWidget(card)
+        self._content_layout.addStretch()
+
+        btn_layout = QHBoxLayout()
+        btn_cancel = PushButton('取消')
+        btn_cancel.clicked.connect(self.reject)
+        btn_restart = PrimaryPushButton(FIF.SYNC, '以管理员身份重启')
+        btn_restart.clicked.connect(self._on_restart)
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_cancel)
+        btn_layout.addWidget(btn_restart)
+        self._content_layout.addLayout(btn_layout)
+
+    def _on_restart(self):
+        if _request_admin_restart():
+            self.accept()
+        else:
+            InfoBar.warning(title='未能重启', content='未获得管理员授权，可稍后重试',
+                            parent=self, duration=3000)
+
+
+def _ensure_admin(reason: str = '修改 IP / DHCP 设置', parent=None) -> bool:
+    """管理员权限检查：无权限时弹出说明对话框，有权限返回 True"""
+    if is_admin():
+        return True
+    AdminRequiredDialog(reason=reason, parent=parent).exec()
+    return False
 
 
 # =========================================================================
@@ -777,7 +933,7 @@ class ScanResultDialog(_FramelessDialog):
     def __init__(self, adapter: dict, ips: list[str], direction_label: str,
                  parent=None, on_ip_set=None):
         super().__init__(parent=parent, title=f'扫描结果 - {direction_label}')
-        self.resize(580, 540)
+        self.resize(612, 566)
         self.adapter = adapter
         self.available_ips: list[str] = []
         self.selected_ip: str | None = None
@@ -928,6 +1084,8 @@ class ScanResultDialog(_FramelessDialog):
         self._open_manual_with_ip(ip)
 
     def _open_manual_with_ip(self, ip: str):
+        if not _ensure_admin('设置静态 IP', parent=self):
+            return
         dlg = ManualIpDialog(self.adapter, preset_ip=ip, parent=self)
         if dlg.exec() == QDialog.Accepted:
             InfoBar.success(title='IP 设置成功',
@@ -937,6 +1095,8 @@ class ScanResultDialog(_FramelessDialog):
                 self._on_ip_set()
 
     def _open_manual(self):
+        if not _ensure_admin('设置静态 IP', parent=self):
+            return
         dlg = ManualIpDialog(self.adapter, parent=self)
         if dlg.exec() == QDialog.Accepted:
             InfoBar.success(title='IP 设置成功',
@@ -952,7 +1112,7 @@ class ScanResultDialog(_FramelessDialog):
 class ManualIpDialog(_FramelessDialog):
     def __init__(self, adapter: dict, preset_ip: str = '', parent=None):
         super().__init__(parent=parent, title=f'手动设置 IP - {adapter["name"]}')
-        self.resize(440, 340)
+        self.resize(472, 366)
         self.adapter = adapter
 
         card = CardWidget()
@@ -1013,21 +1173,6 @@ class ManualIpDialog(_FramelessDialog):
 
         self._content_layout.addWidget(card)
 
-        # 管理员提示
-        if not is_admin():
-            hint = CardWidget()
-            hint.setBorderRadius(8)
-            hint.setStyleSheet(_card_style())
-            hint_layout = QHBoxLayout(hint)
-            hint_layout.setContentsMargins(12, 8, 12, 8)
-            hint_icon = BodyLabel('⚠')
-            hint_icon.setStyleSheet('font-size: 16px; color: #d0870a;')
-            hint_text = BodyLabel('需要管理员权限才能修改 IP，请以管理员身份运行程序')
-            hint_text.setStyleSheet('color: #d0870a;')
-            hint_layout.addWidget(hint_icon)
-            hint_layout.addWidget(hint_text)
-            self._content_layout.addWidget(hint)
-
         self._content_layout.addStretch()
 
         btn_layout = QHBoxLayout()
@@ -1071,7 +1216,7 @@ class ManualIpDialog(_FramelessDialog):
 class DdnsConfigDialog(_FramelessDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent, title='阿里云 DDNS 配置')
-        self.resize(520, 480)
+        self.resize(552, 506)
 
         sub = CaptionLabel('将当前适配器的内网 IP 自动同步到阿里云 DNS 解析记录')
         sub.setStyleSheet(f'color: {_text_secondary()}; margin-bottom: 4px;')
@@ -1270,7 +1415,7 @@ class DdnsConfigDialog(_FramelessDialog):
 class DdnsStatusDialog(_FramelessDialog):
     def __init__(self, parent=None):
         super().__init__(parent=parent, title='DDNS 状态')
-        self.resize(500, 420)
+        self.resize(532, 446)
 
         # 配置信息卡片
         self.cfg_card = CardWidget()
@@ -1541,8 +1686,8 @@ class Plugin:
         dlg = NetworkInfoDialog()
         dlg.exec()
 
-    def _adapter_picker(self, title: str) -> dict | None:
-        sel = AdapterSelectDialog(title)
+    def _adapter_picker(self, title: str, **kwargs) -> dict | None:
+        sel = AdapterSelectDialog(title, **kwargs)
         if sel.exec() != QDialog.Accepted:
             return None
         return sel.selected_adapter()
@@ -1554,7 +1699,7 @@ class Plugin:
             return
         net = calc_network(adapter['ip'], adapter['mask'])
         if not net:
-            InfoBar.warning(title='计算失败', content='无法计算子网范围', parent=None)
+            _toast('warning', '计算失败', '无法计算子网范围')
             return
         # 获取子网内所有可用 IP
         from plugin_sdk import PluginSDK
@@ -1577,7 +1722,7 @@ class Plugin:
             ips = [str(h) for h in all_hosts]
 
         if not ips:
-            InfoBar.info(title='提示', content='子网内没有可用 IP', parent=None)
+            _toast('info', '提示', '子网内没有可用 IP')
             return
 
         dlg = ScanResultDialog(adapter, ips, f'全子网扫描 (共 {len(ips)} 个)',
@@ -1641,21 +1786,28 @@ class Plugin:
         threading.Thread(target=do_ddns_with_retry, daemon=True).start()
 
     def manual_set_ip(self):
+        if not _ensure_admin('手动设置 IP'):
+            return
         adapter = self._get_usable_adapter()
         if not adapter:
-            InfoBar.warning(title='无可用适配器', content='未检测到任何网络适配器', parent=None)
+            _toast('warning', '无可用适配器', '未检测到任何网络适配器')
             return
         dlg = ManualIpDialog(adapter)
         if dlg.exec() == QDialog.Accepted:
             preferred = dlg.combo_adapter.currentText()
-            InfoBar.success(title='IP 设置成功',
-                            content=f'{preferred} 已设置为 {dlg.edit_ip.text()}',
-                            parent=None, duration=3000)
+            _toast('success', 'IP 设置成功',
+                   f'{preferred} 已设置为 {dlg.edit_ip.text()}')
             self.sdk.logger_info(f'静态IP设置成功: {preferred} -> {dlg.edit_ip.text()}')
             self._do_after_ip_set(preferred)
 
     def revert_dhcp(self):
-        adapter = self._adapter_picker('恢复 DHCP')
+        if not _ensure_admin('恢复 DHCP'):
+            return
+        adapter = self._adapter_picker(
+            '恢复 DHCP',
+            tip='将把该适配器恢复为 DHCP 自动获取 IP',
+            ok_text='下一步', ok_icon=FIF.ACCEPT,
+        )
         if not adapter:
             return
         if not self.sdk.show_confirm(
@@ -1665,11 +1817,11 @@ class Plugin:
             return
         ok, msg = set_dhcp(adapter['name'])
         if ok:
-            InfoBar.success(title='DHCP 恢复成功', content=msg, parent=None, duration=3000)
+            _toast('success', 'DHCP 恢复成功', msg)
             self.sdk.logger_info(f'DHCP 恢复成功: {adapter["name"]}')
             self._do_after_ip_set(adapter['name'])
         else:
-            InfoBar.error(title='失败', content=msg, parent=None, duration=3000)
+            _toast('error', '失败', msg, duration=4000)
 
     # ── DDNS ──
 

@@ -1,14 +1,14 @@
 """通用无边框弹窗基类 — 支持深浅主题、拖拽、按钮自定义"""
 
-from PySide6.QtCore import Qt, QPoint
-from PySide6.QtGui import QFont, QMouseEvent
+from PySide6.QtCore import Qt, QPoint, QEasingCurve, QPropertyAnimation
+from PySide6.QtGui import QColor, QCursor, QFont, QGuiApplication, QMouseEvent
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-    QWidget, QTextBrowser, QSizePolicy,
+    QWidget, QTextBrowser, QGraphicsDropShadowEffect,
 )
 from qfluentwidgets import (
     PrimaryPushButton, PushButton,
-    FluentIcon as FIF, isDarkTheme, InfoBar,
+    FluentIcon as FIF, isDarkTheme,
 )
 from typing import Optional
 
@@ -24,13 +24,47 @@ def _theme_colors():
     )
 
 
+def _remove_native_border(widget: QWidget):
+    """移除 Win11 给无边框窗口默认绘制的系统边框（圆角外的一圈矩形直角边框）"""
+    try:
+        import ctypes
+        hwnd = int(widget.winId())
+        # DWMWA_BORDER_COLOR=34, DWMWA_COLOR_NONE=0xFFFFFFFF
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd, 34, ctypes.byref(ctypes.c_ulong(0xFFFFFFFF)), 4)
+    except Exception:
+        pass
+
+
+def _position_dialog(widget: QWidget, parent: Optional[QWidget] = None):
+    """智能定位弹窗
+
+    父窗口可见 → 在父窗口中央弹出（跟随父窗口所在屏幕，多屏友好）；
+    否则 → 以鼠标位置为中心弹出（贴近用户操作点，避免突兀地飞到屏幕中央）。
+    最终位置始终钳制在对应屏幕的可用区域内（避开任务栏）。
+    """
+    anchor_center = None
+    if isinstance(parent, QWidget):
+        top = parent.window()
+        if top is not widget and top.isVisible():
+            anchor_center = top.geometry().center()
+
+    if anchor_center is None:
+        anchor_center = QCursor.pos()
+
+    screen = QGuiApplication.screenAt(anchor_center) or QGuiApplication.primaryScreen()
+    if screen is None:
+        return
+    sg = screen.availableGeometry()
+    w, h = widget.width(), widget.height()
+    x = max(sg.left(), min(anchor_center.x() - w // 2, sg.right() + 1 - w))
+    y = max(sg.top(), min(anchor_center.y() - h // 2, sg.bottom() + 1 - h))
+    widget.move(x, y)
+
+
 def _center_on_screen(widget, width: int, height: int):
-    """将 widget 居中于屏幕"""
-    from PySide6.QtGui import QGuiApplication
-    screen = QGuiApplication.primaryScreen()
-    if screen:
-        sg = screen.availableGeometry()
-        widget.move(sg.center().x() - width // 2, sg.center().y() - height // 2)
+    """兼容入口：旧版本导出过此函数，统一改走 _position_dialog"""
+    _position_dialog(widget, None)
 
 
 class FramelessDialog(QDialog):
@@ -47,20 +81,28 @@ class FramelessDialog(QDialog):
         self._is_dragging = False
         self._drag_pos = QPoint()
         self._result_value = False
+        self._title_bar: Optional[QWidget] = None
+        self._fade_anim: Optional[QPropertyAnimation] = None
 
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setObjectName("framelessDialog")
 
-        # 主布局
+        # 主布局：四周留出阴影绘制空间
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setContentsMargins(16, 10, 16, 16)
         self._layout.setSpacing(0)
 
         # ── outer 容器：真正 clip 圆角 ──
         self._outer = QWidget(self)
         self._outer.setObjectName("fdOuter")
+        # 无边框窗口没有系统阴影，补一层柔和投影，避免弹窗"贴"在屏幕上的突兀感
+        shadow = QGraphicsDropShadowEffect(self._outer)
+        shadow.setBlurRadius(32)
+        shadow.setOffset(0, 8)
+        shadow.setColor(QColor(0, 0, 0, 100))
+        self._outer.setGraphicsEffect(shadow)
         self._outerLayout = QVBoxLayout(self._outer)
         self._outerLayout.setContentsMargins(0, 0, 0, 0)
         self._outerLayout.setSpacing(0)
@@ -116,6 +158,7 @@ class FramelessDialog(QDialog):
         close_btn.mousePressEvent = lambda e: self.reject()
         tb.addWidget(close_btn)
         self._outerLayout.addWidget(bar)
+        self._title_bar = bar
 
     def add_content(self, widget: QWidget, stretch: int = 1):
         """向内容区添加控件"""
@@ -145,10 +188,13 @@ class FramelessDialog(QDialog):
 
     # ── 拖拽 ──
     def mousePressEvent(self, event: QMouseEvent):
-        if event.button() == Qt.LeftButton and event.position().y() <= 44:
-            self._is_dragging = True
-            self._drag_pos = event.globalPosition().toPoint() - self.pos()
-            event.accept()
+        # 按下点落在标题栏内才开始拖拽（需换算到 _outer 坐标，主布局有阴影留白）
+        if event.button() == Qt.LeftButton and self._title_bar is not None:
+            pos_in_outer = self._outer.mapFrom(self, event.position().toPoint())
+            if self._title_bar.geometry().contains(pos_in_outer):
+                self._is_dragging = True
+                self._drag_pos = event.globalPosition().toPoint() - self.pos()
+                event.accept()
 
     def mouseMoveEvent(self, event: QMouseEvent):
         if self._is_dragging:
@@ -160,15 +206,27 @@ class FramelessDialog(QDialog):
             self._is_dragging = False
             event.accept()
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        _remove_native_border(self)
+        # 淡入过渡，缓解弹窗突然出现的突兀感
+        self._fade_anim = QPropertyAnimation(self, b"windowOpacity", self)
+        self._fade_anim.setDuration(150)
+        self._fade_anim.setStartValue(0.0)
+        self._fade_anim.setEndValue(1.0)
+        self._fade_anim.setEasingCurve(QEasingCurve.OutCubic)
+        self._fade_anim.start()
+
     # ── 快捷静态方法 ──
     @staticmethod
     def show_message(title: str, content: str, parent=None):
         """显示信息弹窗"""
         dlg = FramelessDialog(parent)
         dlg.setWindowTitle(title)
-        dlg.setFixedSize(400, 220)
+        # 尺寸 = 内容区 + 阴影留白（四周约 16px）
+        dlg.setFixedSize(432, 248)
         dlg._title_label.setText(title)
-        _center_on_screen(dlg, 400, 220)
+        _position_dialog(dlg, parent)
 
         label = QLabel(content, dlg._outer)
         label.setWordWrap(True)
@@ -187,9 +245,10 @@ class FramelessDialog(QDialog):
         """显示确认弹窗，返回 True=确认 / False=取消"""
         dlg = FramelessDialog(parent)
         dlg.setWindowTitle(title)
-        dlg.setFixedSize(420, 200)
+        # 尺寸 = 内容区 + 阴影留白（四周约 16px）
+        dlg.setFixedSize(452, 228)
         dlg._title_label.setText(title)
-        _center_on_screen(dlg, 420, 200)
+        _position_dialog(dlg, parent)
 
         label = QLabel(content, dlg._outer)
         label.setWordWrap(True)
@@ -222,9 +281,10 @@ class UpdateDialog(FramelessDialog):
         self._download_url = download_url
 
         self.setWindowTitle("发现新版本")
-        self.setFixedSize(540, 480)
+        # 尺寸 = 内容区 + 阴影留白（四周约 16px）
+        self.setFixedSize(572, 508)
         self._title_label.setText("发现新版本")
-        _center_on_screen(self, 540, 480)
+        _position_dialog(self, parent)
 
         bg, text, sec, border = _theme_colors()
         dark = isDarkTheme()

@@ -68,14 +68,14 @@ class PluginSDK:
                 PrimaryPushButton, PushButton,
                 ListWidget, FluentIcon as FIF,
             )
-            from ui.components.frameless_dialog import _center_on_screen, _theme_colors
+            from ui.components.frameless_dialog import _position_dialog, _theme_colors
 
             dlg = QDialog()
             dlg.setWindowTitle(title)
             dlg.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
             dlg.setAttribute(Qt.WA_TranslucentBackground, True)
             dlg.setFixedSize(380, 400)
-            _center_on_screen(dlg, 380, 400)
+            _position_dialog(dlg, None)
 
             bg, text, sec, border = _theme_colors()
             layout = QVBoxLayout(dlg)

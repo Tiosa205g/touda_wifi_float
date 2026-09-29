@@ -7,7 +7,7 @@ import base64
 from typing import Dict, List
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QCursor, QGuiApplication, QIcon
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout
 
 from qfluentwidgets import (
@@ -26,7 +26,6 @@ from qfluentwidgets import (
     setTheme,
     Theme,
     isDarkTheme,
-    FluentTitleBar,
     SwitchButton,
 )
 
@@ -721,7 +720,8 @@ class AccountsInterface(_BaseInterface):
             InfoBar.warning(title='不允许删除', content='0 号账户不能删除，只能修改', duration=2000, parent=self)
             return
         base = os.path.basename(self.accounts[idx])
-        if FramelessDialog.show_confirm("确认删除", f"确定删除 {base} ?", self):
+        # 以设置窗口为父级：弹窗居中于设置窗口，且不继承页面的按钮样式
+        if FramelessDialog.show_confirm("确认删除", f"确定删除 {base} ?", self.window()):
             try:
                 os.remove(self.accounts[idx])
                 InfoBar.success(title='已删除', content=base, duration=1200, parent=self)
@@ -894,7 +894,7 @@ class LinksInterface(_BaseInterface):
         data = self._load_all()
         if not t or t not in data or n not in data[t]:
             return
-        if FramelessDialog.show_confirm("确认删除", f"删除 [{t}]/{n} ?", self):
+        if FramelessDialog.show_confirm("确认删除", f"删除 [{t}]/{n} ?", self.window()):
             del data[t][n]
             if not data[t]:
                 del data[t]
@@ -948,27 +948,32 @@ class SettingsWindow(FluentWindow):
         self.setResizeEnabled(False)
         self.setAttribute(Qt.WA_QuitOnClose, False)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
-        # 独立窗口
-        self.setWindowFlags(Qt.Window)
+        # 注意：不要调用 setWindowFlags(Qt.Window)！parent=None 时窗口本就是独立的，
+        # 而改写标志会重建原生窗口/丢弃 qframelesswindow 设置的 NoTitleBarBackgroundHint
+        # 等组合，导致 DWM 深色沉浸属性残留，切换主题后窗口渲染成灰色/半透明
         try:
             self.setWindowIcon(QIcon('res/ico/favicon.ico'))
         except Exception:
             pass
-        # 使用 qfluent-widgets 的 FluentTitleBar 作为标题栏
-        titleBar = FluentTitleBar(self)
-        self.setTitleBar(titleBar)
+        # FluentWindow 自带 FluentTitleBar（构造时已连接 windowTitleChanged 同步标题）。
+        # 不要重新 setTitleBar：新标题栏收不到已发出过的信号，会导致标题栏空白无标题
         # 隐藏最小化和最大化按钮
-        titleBar.minBtn.hide()
-        titleBar.maxBtn.hide()
+        self.titleBar.minBtn.hide()
+        self.titleBar.maxBtn.hide()
         self.titleBar.setDoubleClickEnabled(False) # 禁止双击最大化/还原
-        
-        # 优先启用云母/亚克力效果（Win11/Win10支持）
-        for api in ('setMicaEffectEnabled', 'setAcrylicEffectEnabled'):
-            try:
-                getattr(self, api)(True)
-                break
-            except Exception:
-                continue
+        # 导航栏左上角的返回按钮在本应用中没有功能，隐藏以免误导
+        self.navigationInterface.setReturnButtonVisible(False)
+
+        # 显式关闭云母效果：qfluentwidgets 在 Win11 默认开启 mica，开启后窗口背景为全透明，
+        # 完全依赖 DWM 材质兜底；一旦材质失效（系统关闭"透明效果"等）浅色主题会直接露出黑底。
+        # 关闭后由库绘制不透明的主题背景色（浅 #F0F4F9 / 深 #202020），标题栏与内容区同色
+        self.setMicaEffectEnabled(False)
+        self._resetNativeBackdrop()
+        # 主题切换时同步原生窗口的深浅属性（qfluentwidgets 仅在 mica 开启时才更新）
+        from qfluentwidgets.common.config import qconfig
+        qconfig.themeChangedFinished.connect(self._resetNativeBackdrop)
+        # 主题变化时自动重应用页面配色（不依赖调用方记得调 applyCustomStyleForTheme）
+        qconfig.themeChanged.connect(self._onThemeChanged)
         # 根据主题应用定制样式（浅/深）
         try:
             current_theme = Theme.DARK if isDarkTheme() else Theme.LIGHT
@@ -996,118 +1001,130 @@ class SettingsWindow(FluentWindow):
             except Exception:
                 pass
 
-        self.addSubInterface(self.generalInterface, FIF.SETTING, '常规', NavigationItemPosition.TOP)
-        self.addSubInterface(self.webvpnInterface, FIF.VPN, 'WebVPN', NavigationItemPosition.TOP)
-        self.addSubInterface(self.accountsInterface, FIF.PEOPLE, 'WiFi账户', NavigationItemPosition.TOP)
-        self.addSubInterface(self.linksInterface, FIF.LINK, '链接', NavigationItemPosition.TOP)
+        # isTransparent=True：页面背景透明，标题栏/内容区共用云母材质，
+        # 消除标题栏与内容区之间的颜色断层和"框中框"嵌套
+        self.addSubInterface(self.generalInterface, FIF.SETTING, '常规', NavigationItemPosition.TOP, isTransparent=True)
+        self.addSubInterface(self.webvpnInterface, FIF.VPN, 'WebVPN', NavigationItemPosition.TOP, isTransparent=True)
+        self.addSubInterface(self.accountsInterface, FIF.PEOPLE, 'WiFi账户', NavigationItemPosition.TOP, isTransparent=True)
+        self.addSubInterface(self.linksInterface, FIF.LINK, '链接', NavigationItemPosition.TOP, isTransparent=True)
 
         self.navigationInterface.setExpandWidth(240)
         self.stackedWidget.setCurrentWidget(self.generalInterface)
 
-        self.move(self.geometry().center() - self.rect().center())# 居中
+        # 在鼠标所在屏幕居中（入口来自托盘/悬浮球时跟随用户上下文）。
+        # 不能用 geometry()：窗口显示前它无意义，会把窗口丢到屏幕左上角 (0,0)
+        screen = QGuiApplication.screenAt(QCursor.pos()) or QGuiApplication.primaryScreen()
+        if screen is not None:
+            sg = screen.availableGeometry()
+            self.move(sg.center() - self.rect().center())
 
         logger.info('设置窗口初始化完毕')
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        # 窗口真正创建后再次清理 DWM 材质残留，防止原生窗口重建时属性回退
+        self._resetNativeBackdrop()
+
+    def _onThemeChanged(self, *_):
+        """主题变化时刷新页面配色，保持内容区 QSS 背景与主题一致"""
+        try:
+            self.applyCustomStyleForTheme(Theme.DARK if isDarkTheme() else Theme.LIGHT)
+        except Exception:
+            pass
+
+    def _resetNativeBackdrop(self, *_):
+        """清理 DWM 云母材质残留
+
+        qfluentwidgets 关闭 mica 时只重置 WCA accent，DWMWA_SYSTEMBACKDROP_TYPE
+        仍为 2（mica），材质会透过透明的内容区把页面染灰/染色，需显式置为
+        DWMSBT_NONE，并让沉浸式深色属性跟随当前主题。
+        """
+        if self.isMicaEffectEnabled():
+            return
+        try:
+            import ctypes
+            hwnd = int(self.winId())
+            backdrop = ctypes.c_int(0)                  # DWMSBT_NONE
+            immersive = ctypes.c_int(1 if isDarkTheme() else 0)
+            dwm = ctypes.windll.dwmapi
+            dwm.DwmSetWindowAttribute(hwnd, 38, ctypes.byref(backdrop), 4)   # SYSTEMBACKDROP_TYPE
+            dwm.DwmSetWindowAttribute(hwnd, 20, ctypes.byref(immersive), 4)  # USE_IMMERSIVE_DARK_MODE
+        except Exception:
+            pass
+
     def applyCustomStyleForTheme(self, theme: Theme):
-        """根据主题切换浅/深自定义样式，避免深色下文字/背景不匹配"""
+        """根据主题切换浅/深控件配色
+
+        只负责控件样式；窗口与页面背景交给 qfluentwidgets 主题/云母材质统一绘制，
+        避免标题栏与内容区的颜色断层和"框中框"嵌套。
+        选择器限定在四个设置页内，防止样式经父子关系级联到确认弹窗的按钮上。
+        """
+        pages = ('#generalInterface', '#webvpnInterface',
+                 '#accountsInterface', '#linksInterface')
+
+        def scoped(selector: str) -> str:
+            return ', '.join(f'{p} {selector}' for p in pages)
+
         if theme == Theme.DARK:
-            custom_style = """
-SettingsWindow {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #1f1f1f, stop:1 #242424);
-    background-color: rgba(20,20,20,0.85);
-    border-radius: 18px;
-}
-QWidget#generalInterface, QWidget#webvpnInterface, QWidget#accountsInterface, QWidget#linksInterface {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #2a2a2a, stop:1 #1f1f1f);
-    border-radius: 12px;
-    border: 1px solid #3b3b3b;
-}
-StrongBodyLabel {
-    color: #90CAF9;
-    font-weight: bold;
-    font-size: 17px;
-}
-PushButton {
-    background: #2B88D8;
-    color: #fff;
-    border-radius: 8px;
-    padding: 6px 18px;
-    font-weight: 500;
-    border: 1px solid transparent;
-}
-PushButton:hover {
-    background: #1f6fb5;
-    color: #fff;
-    border: 1px solid #1f6fb5;
-}
-LineEdit, PasswordLineEdit, ComboBox {
-    background: rgba(30,30,30,0.95);
-    color: #e6e6e6;
-    border: 2px solid #3b3b3b;
-    border-radius: 6px;
-    padding: 4px 8px;
-}
-QAbstractSpinBox, QSpinBox {
-    background: rgba(30,30,30,0.95);
-    color: #e6e6e6;
-    border: 2px solid #3b3b3b;
-    border-radius: 6px;
-    padding: 4px 8px;
-}
-LineEdit:focus, PasswordLineEdit:focus, ComboBox:focus {
-    border: 2px solid #2B88D8;
-}
-"""
+            accent = '#90CAF9'
+            btn_bg, btn_hover = '#2B88D8', '#1f6fb5'
+            field_bg = 'rgba(30,30,30,0.95)'
+            field_border, field_fg = '#3b3b3b', '#e6e6e6'
+            focus_border = '#2B88D8'
+            page_bg = '#202020'   # 与 qfluentwidgets 深色窗口底色一致
         else:
-            custom_style = """
-SettingsWindow {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #e3f0ff, stop:1 #f7f7fa);
-    background-color: rgba(255,255,255,0.85);
-    border-radius: 18px;
-}
-QWidget#generalInterface, QWidget#webvpnInterface, QWidget#accountsInterface, QWidget#linksInterface {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #f0f6ff, stop:1 #e6f0fa);
-    border-radius: 12px;
-    border: 1px solid #cce4f7;
-}
-StrongBodyLabel {
-    color: #0078D4;
+            accent = '#0078D4'
+            btn_bg, btn_hover = '#0078D4', '#005a9e'
+            field_bg = 'rgba(255,255,255,0.95)'
+            field_border, field_fg = '#cce4f7', '#1f1f1f'
+            focus_border = '#0078D4'
+            page_bg = '#f0f4f9'   # 与 qfluentwidgets 浅色窗口底色一致
+
+        # 内容区自己绘制不透明背景，与窗口底色同值：
+        # 不再依赖"透明页面透出窗口 paint"（该路径在 Qt6.10+ 无边框 alpha
+        # 合成下可能被 DWM 打穿，把窗口后面的内容混进子页面）
+        page_bg_rules = ', '.join(pages)
+
+        custom_style = f"""
+{page_bg_rules} {{
+    background-color: {page_bg};
+    border: none;
+}}
+{scoped('StrongBodyLabel')} {{
+    color: {accent};
     font-weight: bold;
     font-size: 17px;
-}
-PushButton {
-    background: #0078D4;
+}}
+{scoped('PushButton')} {{
+    background: {btn_bg};
     color: #fff;
     border-radius: 8px;
     padding: 6px 18px;
     font-weight: 500;
     border: 1px solid transparent;
-}
-PushButton:hover {
-    background: #005a9e;
+}}
+{scoped('PushButton:hover')} {{
+    background: {btn_hover};
     color: #fff;
-    border: 1px solid #005a9e;
-}
-LineEdit, PasswordLineEdit, ComboBox {
-    background: rgba(255,255,255,0.95);
-    border: 2px solid #cce4f7;
+    border: 1px solid {btn_hover};
+}}
+{scoped('LineEdit')}, {scoped('PasswordLineEdit')}, {scoped('ComboBox')} {{
+    background: {field_bg};
+    color: {field_fg};
+    border: 2px solid {field_border};
     border-radius: 6px;
     padding: 4px 8px;
-}
-QAbstractSpinBox, QSpinBox {
-    background: rgba(255,255,255,0.95);
-    color: #1f1f1f;
-    border: 2px solid #cce4f7;
+}}
+{scoped('QAbstractSpinBox')}, {scoped('QSpinBox')} {{
+    background: {field_bg};
+    color: {field_fg};
+    border: 2px solid {field_border};
     border-radius: 6px;
     padding: 4px 8px;
-}
-LineEdit:focus, PasswordLineEdit:focus, ComboBox:focus {
-    border: 2px solid #0078D4;
-}
+}}
+{scoped('LineEdit:focus')}, {scoped('PasswordLineEdit:focus')}, {scoped('ComboBox:focus')} {{
+    border: 2px solid {focus_border};
+}}
 """
         # 直接替换样式，避免多次叠加导致性能与视觉问题
         self.setStyleSheet(custom_style)
