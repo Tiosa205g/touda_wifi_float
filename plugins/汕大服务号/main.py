@@ -1,5 +1,6 @@
 
 import base64
+import time
 import pluggy
 import requests
 from bs4 import BeautifulSoup
@@ -11,7 +12,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout
 from plugin_sdk import PluginSDK, PluginMenu
 
 PLUGIN_NAME = '汕大服务号插件'
-PLUGIN_VERSION = '1.0.0'
+PLUGIN_VERSION = '1.0.1'
 PLUGIN_AUTHOR = 'tiosa'
 PLUGIN_PATH = Path(__file__).parent
 
@@ -36,16 +37,21 @@ class SDK(PluginSDK):
         ).decode('utf-8')
         return {'name': name, 'pwd': password}
 class Plugin:  # 类名固定为 Plugin，不能变动，否则无法识别
+    # 登录态缓存有效期（秒）：主程序每次打开右键菜单都会重建插件菜单，
+    # 缓存避免每次都同步请求网络（最多阻塞 timeout 秒）
+    LOGIN_STATE_TTL = 180
+
     @hook
     def start(self,api) -> bool:
-        """插件加载时执行，传api包含已实例化的wifi和webvpn类"""
+        """插件加载时执行,传api包含已实例化的wifi和webvpn类"""
         self.api = api
         self.sdk = SDK(self.api)
         self.session = requests.session()
         self.session.trust_env = True
         self.session.verify = False
-        self.session.headers.update({'User-Agent':'Mozilla/5.0 (Linux; Android 14; ALP-AN00 Build/HONORALP-AN00T; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.180 Mobile Safari/537.36 XWEB/1380267 MMWEBSDK/20250804 MMWEBID/6729 MicroMessenger/8.0.63.2920(0x28003F3C) WeChat/arm64 Weixin NetType/WIFI Language/zh_CN ABI/arm64',
+        self.session.headers.update({'User-Agent':'Mozilla/5.0 (Linux; Android 14; ALP-AN00 Build/HONORALP-AN00T; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.180 Mobile Safari/537.36 XWEB/1380267 MMWEBID/20250804 MMWEBID/6729 MicroMessenger/8.0.63.2920(0x28003F3C) WeChat/arm64 Weixin NetType/WIFI Language/zh_CN ABI/arm64',
                                      'Content-Type':'application/x-www-form-urlencoded'})
+        self._login_cache = {'name': None, 'ok': False, 'ts': 0.0}
         return True # 返回true才会视为有效插件
     @hook
     def on_disable(self):
@@ -93,32 +99,60 @@ class Plugin:  # 类名固定为 Plugin，不能变动，否则无法识别
             return ''
         return base64.urlsafe_b64encode(name.encode()).decode('utf-8').rstrip('=')
     def is_login(self,name:str)->bool:
-        """判断是否登录"""
-        open_id = self.get_encode_openid(name)
-        r = self.session.get(url=f'http://wechat.stu.edu.cn/wechat/login/login?source_type=dorm_information&openid={open_id}',timeout=3)
-        if r.status_code == 200:
-            return r.text.find('登录') == -1 # 寻找是否有 登录 字样，如果未绑定就会有登录提示
-        return False               
+        """判断是否登录（结果按账号缓存 LOGIN_STATE_TTL 秒，避免每次构建菜单都请求网络）"""
+        now = time.time()
+        if (self._login_cache['name'] == name
+                and now - self._login_cache['ts'] < self.LOGIN_STATE_TTL):
+            return self._login_cache['ok']
+        ok = False
+        try:
+            open_id = self.get_encode_openid(name)
+            r = self.session.get(url=f'http://wechat.stu.edu.cn/wechat/login/login?source_type=dorm_information&openid={open_id}',timeout=3)
+            # 寻找是否有 登录 字样，如果未绑定就会有登录提示
+            ok = r.status_code == 200 and r.text.find('登录') == -1
+        except Exception as e:
+            self.sdk.logger_error(f'查询登录态失败: {e}')
+        self._login_cache = {'name': name, 'ok': ok, 'ts': time.time()}
+        return ok
+
+    def _invalidate_login_cache(self):
+        """绑定/解绑后调用，让下次菜单构建重新查询登录态"""
+        self._login_cache = {'name': None, 'ok': False, 'ts': 0.0}
+
     def auth_wechat(self,name:str,pwd:str)->bool:
         """使用伪造openid进行登录并绑定"""
         open_id = self.get_encode_openid(name)
-        r = self.session.post(url='http://wechat.stu.edu.cn/wechat/login/login_verify',data=f'ldap_account={name}&ldap_password={pwd}&btn_ok=登录&source_type=dorm_information&openid={open_id}')
-        if r.status_code == 200:
-            return r.text.find('成功') != -1
-        return False 
+        try:
+            r = self.session.post(url='http://wechat.stu.edu.cn/wechat/login/login_verify',data=f'ldap_account={name}&ldap_password={pwd}&btn_ok=登录&source_type=dorm_information&openid={open_id}',timeout=3)
+        except Exception as e:
+            self.sdk.logger_error(f'绑定请求失败: {e}')
+            return False
+        if r.status_code == 200 and r.text.find('成功') != -1:
+            self._invalidate_login_cache()
+            return True
+        return False
     def unbind_wechat(self,name:str)->bool:
         """将伪造openid取消绑定"""
         open_id = self.get_encode_openid(name)
-        r = self.session.get(url=f'http://wechat.stu.edu.cn/wechat/ldap_openid_ok.aspx?openid={open_id}')
+        try:
+            r = self.session.get(url=f'http://wechat.stu.edu.cn/wechat/ldap_openid_ok.aspx?openid={open_id}',timeout=3)
+        except Exception as e:
+            self.sdk.logger_error(f'解绑请求失败: {e}')
+            return False
         if r.status_code != 200:
             return False
-        
+
         soup = BeautifulSoup(r.text,'lxml')
 
         __VIEWSTATE = soup.find('input',attrs={'type':'hidden','name':'__VIEWSTATE'}).get('value')
         __EVENTVALIDATION = soup.find('input',attrs={'type':'hidden','name':'__EVENTVALIDATION'}).get('value')
 
-        r = self.session.post(url=f'http://wechat.stu.edu.cn/wechat/ldap_openid_ok.aspx?openid={open_id}',data=f'__VIEWSTATE={__VIEWSTATE}&__EVENTVALIDATION={__EVENTVALIDATION}&Btn_cancel_bind=')
-        if r.status_code == 200:
-            return r.text.find('取消绑定成功') != -1
+        try:
+            r = self.session.post(url=f'http://wechat.stu.edu.cn/wechat/ldap_openid_ok.aspx?openid={open_id}',data=f'__VIEWSTATE={__VIEWSTATE}&__EVENTVALIDATION={__EVENTVALIDATION}&Btn_cancel_bind=',timeout=3)
+        except Exception as e:
+            self.sdk.logger_error(f'解绑提交失败: {e}')
+            return False
+        if r.status_code == 200 and r.text.find('取消绑定成功') != -1:
+            self._invalidate_login_cache()
+            return True
         return False
