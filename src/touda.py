@@ -1,4 +1,5 @@
 import os
+import threading
 import pyotp
 import requests
 import re
@@ -168,6 +169,8 @@ class webvpn(QObject):
             twfid: 如果有twfid则不需要登录，直接使用twfid进行登录
         """
         super().__init__()
+        # 可重入锁：串行化后台轮询/登录线程与主线程对同一 session 的并发访问
+        self._lock = threading.RLock()
         self.session = requests.Session()
         self.session.trust_env = True
         self.session.verify = False
@@ -237,16 +240,21 @@ class webvpn(QObject):
         """
         如果twfid能用则直接使用twfid登录，否则使用用户名和密码登录
         """
-        if not self.getState():
-            self.login()
-            return self.getState()
-        return True
+        with self._lock:
+            if not self.getState():
+                self.login()
+                return self.getState()
+            return True
 
     def login(self):
+        with self._lock:
+            return self._login()
+
+    def _login(self):
         # 需要使用会话来保持登录状态
         # 第一步：获取 CSRF_RAND_CODE 和 TwfID
         url_auth = "https://webvpn.stu.edu.cn/por/login_auth.csp?apiversion=1"
-        response_auth = self.session.get(url_auth, headers=self.header)
+        response_auth = self.session.get(url_auth, headers=self.header, timeout=(3, 7))
         if response_auth.status_code != 200:
             return "访问webvpn失败,请检查是否连接WiFi"
         xml_data = response_auth.content
@@ -268,7 +276,7 @@ class webvpn(QObject):
         }
 
         response_login = self.session.post(
-            url_login, data=data_login, headers=self.header
+            url_login, data=data_login, headers=self.header, timeout=(3, 7)
         )
         if response_login.status_code != 200:
             return "可能多次输入错密码出现了验证码，请自己手动登录一次webvpn"
@@ -279,7 +287,7 @@ class webvpn(QObject):
         url_token = "https://webvpn.stu.edu.cn/auth/token?apiversion=1"
         data_token = {"twfid": twfid, "svpn_inputtoken": passkey}
         response_token = self.session.post(
-            url_token, data=data_token, headers=self.header
+            url_token, data=data_token, headers=self.header, timeout=(3, 7)
         )
         if response_token.status_code != 200:
             return "动态口令错误，请检查key是否正确"
@@ -301,19 +309,22 @@ class webvpn(QObject):
         self.twfid_update.emit(self.twfid)
 
     def getState(self):
-        r = self.session.get(
-            "https://webvpn.stu.edu.cn/por/conf.csp?apiversion=1", headers=self.header
-        )
-        if r.status_code == 200:
-            data = r.content.decode()
-            if "unexpected user service" in data or len(data) < 50:
-                # logger.info(f"data:{data}")
+        with self._lock:
+            r = self.session.get(
+                "https://webvpn.stu.edu.cn/por/conf.csp?apiversion=1",
+                headers=self.header,
+                timeout=(3, 7),
+            )
+            if r.status_code == 200:
+                data = r.content.decode()
+                if "unexpected user service" in data or len(data) < 50:
+                    # logger.info(f"data:{data}")
+                    self._clear_twfid()
+                    return False
+                return True
+            else:
                 self._clear_twfid()
                 return False
-            return True
-        else:
-            self._clear_twfid()
-            return False
 
     def create_url(self, url: str) -> str:
         """
@@ -340,7 +351,7 @@ def GtoM(b):
     return b
 
 
-def get_data(put) -> tuple[float, float]:
+def get_data(put) -> tuple[float, float, str]:
     """
     根据流量请求包，分割流量数据
     :param put:
@@ -442,6 +453,9 @@ class wifi(QObject):
         wifi._name = name
         wifi._password = password
 
+        # 可重入锁：串行化轮询线程/切换账号线程/启动登录线程对 session 的并发访问
+        self._lock = threading.RLock()
+
         self.session = requests.Session()
         self.session.trust_env = True
         self.session.verify = False
@@ -480,19 +494,20 @@ class wifi(QObject):
         """
         注销登录
         """
-        try:
-            r = self.session.post(
-                self.url,
-                headers=self.header,
-                data="opr=logout&ipv4or6=",
-                timeout=(1, 2),
-            )
-        except requests.exceptions.Timeout:
-            return "注销请求超时，可能处于临时用户阶段或不在校园网环境"
-        if r.status_code == 200:
-            return r.content.decode()
-        else:
-            return "注销失败，请检查网络连接"
+        with self._lock:
+            try:
+                r = self.session.post(
+                    self.url,
+                    headers=self.header,
+                    data="opr=logout&ipv4or6=",
+                    timeout=(1, 2),
+                )
+            except requests.exceptions.Timeout:
+                return "注销请求超时，可能处于临时用户阶段或不在校园网环境"
+            if r.status_code == 200:
+                return r.content.decode()
+            else:
+                return "注销失败，请检查网络连接"
 
     def change_account(self, name, password):
         self.name = name
@@ -500,6 +515,10 @@ class wifi(QObject):
         return self.login()
 
     def login(self) -> bool:
+        with self._lock:
+            return self._login()
+
+    def _login(self) -> bool:
         if self.name == "" or self.password == "":
             logger.warning("账号或密码为空")
             return False
@@ -544,6 +563,10 @@ class wifi(QObject):
         """
         获取当前登录状态
         """
+        with self._lock:
+            return self._get_state()
+
+    def _get_state(self) -> state:
         state = self.state()
 
         try:

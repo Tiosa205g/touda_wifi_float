@@ -26,7 +26,7 @@ _fix_working_dir()
 from src.logging_config import logger
 from src.config import CfgParse
 
-VERSION = "v1.4.7.3"
+VERSION = "v1.4.7.4"
 CONFIG_DIR = os.path.join(os.getcwd(), "config")
 MAIN_CFG = os.path.join(CONFIG_DIR, "main.toml")
 LINKS_CFG = os.path.join(CONFIG_DIR, "links.toml")
@@ -135,11 +135,9 @@ if __name__ == "__main__":
     win.wifi.state_update.connect(
         lambda state: logger.info(f"校园网状态更新：{state}")
     )
-    win.wifi.flux_update.connect(
-        lambda total, used: win.ui.waterBall.set_progress(
-            (((total - used) * 100 / total) if total != 0 else 100)
-        )
-    )
+    # 连接到 FloatBall 的槽（主线程接收者）：后台线程发射信号时自动队列化，
+    # 避免直连 lambda 在工作线程里操作 UI
+    win.wifi.flux_update.connect(win.on_flux_update)
 
     # 后台执行校园网登录和 WebVPN 登录，不阻塞 UI
     wifi_thread, wifi_worker = start_worker_in_thread(

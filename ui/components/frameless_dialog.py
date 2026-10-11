@@ -84,7 +84,10 @@ class FramelessDialog(QDialog):
         self._title_bar: Optional[QWidget] = None
         self._fade_anim: Optional[QPropertyAnimation] = None
 
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        # WindowStaysOnTopHint：悬浮球本身是置顶窗（Tool+Topmost），
+        # 弹窗不置顶会被它遮住；置顶后新建弹窗经 raise_/activateWindow 处于最上层
+        self.setWindowFlags(
+            Qt.FramelessWindowHint | Qt.Dialog | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setObjectName("framelessDialog")
@@ -209,6 +212,9 @@ class FramelessDialog(QDialog):
     def showEvent(self, event):
         super().showEvent(event)
         _remove_native_border(self)
+        # 置顶窗之间后显者在上：确保弹窗盖住悬浮球等既有顶层窗
+        self.raise_()
+        self.activateWindow()
         # 淡入过渡，缓解弹窗突然出现的突兀感
         self._fade_anim = QPropertyAnimation(self, b"windowOpacity", self)
         self._fade_anim.setDuration(150)

@@ -94,7 +94,12 @@ class FloatBall(QWidget):
         self._used_twfid = None  # 记录已使用过的 twfid，用于判断是否首次使用
 
         self.update_timer = Update_timer(self.wifi, parent=self)
-        self._cached_menu = None  # 右键菜单缓存（首次打开时构建，后续复用）
+        self._cached_menu = None  # 右键菜单缓存（框架构建一次复用，动态区每次打开刷新）
+        self._link_menu = None
+        self._webvpn_menu = None
+        self._account_menu = None
+        self._plugin_menu = None
+        self._dynamic_spec = None  # 动态菜单区内容指纹（未变化时跳过重建，避免无谓的内存churn）
         self._switch_thread = None  # 账号切换后台线程引用
         self._switch_worker = None  # 账号切换 Worker 引用
         self._update_thread = None  # 检查更新后台线程引用
@@ -159,6 +164,16 @@ class FloatBall(QWidget):
             self.ui.waterBall.wave_animation.pause()
         super().hideEvent(event)
 
+    def on_flux_update(self, total: float, used: float):
+        """流量更新槽：水球显示剩余百分比。
+
+        以 FloatBall（主线程 QObject）为接收者连接 wifi.flux_update，
+        后台线程发射时 Qt 自动走队列连接，保证在主线程操作 UI。
+        """
+        self.ui.waterBall.set_progress(
+            ((total - used) * 100 / total) if total != 0 else 100
+        )
+
     def showEvent(self, event):
         """窗口显示时恢复波浪动画，并弹出缓存的更新提示（静默启动场景）"""
         if self.ui.waterBall.wave_animation.state() == QPropertyAnimation.Paused:
@@ -181,50 +196,22 @@ class FloatBall(QWidget):
         super().showEvent(event)
 
     def waterBall_menu(self, pos):
-        """右键菜单：菜单对象缓存复用，每次打开不再新建，彻底解决内存增长"""
+        """右键菜单：菜单框架缓存复用（防内存增长），账号/链接/插件区每次打开时刷新"""
         if self._cached_menu is None:
             self._cached_menu = self._build_menu()
+        else:
+            self._refresh_dynamic_menus()
         self._cached_menu.exec(self.mapToGlobal(pos))
 
     def _build_menu(self):
-        """一次性构建右键菜单（仅在首次右键时调用）"""
+        """一次性构建右键菜单框架（静态部分 + 动态区容器，内容刷新见 _refresh_dynamic_menus）"""
         menu = MyRoundMenu()
-        accountMenu = MyRoundMenu("账号", parent=menu)
-        linkMenu = MyRoundMenu("链接", parent=menu)
-        webvpnMenu = MyRoundMenu("webvpn相关", parent=menu)
-        pluginMenu = MyRoundMenu("插件", parent=menu)
+        self._link_menu = MyRoundMenu("链接", parent=menu)
+        self._webvpn_menu = MyRoundMenu("webvpn相关", parent=menu)
+        self._account_menu = MyRoundMenu("账号", parent=menu)
+        self._plugin_menu = MyRoundMenu("插件", parent=menu)
 
-        try:
-            for file in sorted(os.listdir("config")):
-                match = re.match(r"account_(\d+)\.toml", file)
-                if match:
-                    now = config.CfgParse("config/" + file)
-                    name = now.get("setting", "name")
-                    password = base64.b64decode(
-                        now.get("setting", "password", "").encode("utf-8")
-                    ).decode("utf-8")
-                    if name and password:
-                        index = int(match.group(1))
-                        accountMenu.addAction(
-                            Action(
-                                text="切换为" + name,
-                                icon=FIF.CHAT,
-                                triggered=partial(self.change_account, name, password, index),
-                            )
-                        )
-            logger.info("账号菜单加载完成")
-        except Exception:
-            logger.exception("加载账号菜单失败")
-
-        try:
-            linkMenu.addAction(
-                Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link)
-            )
-            self.create_links_menu(linkMenu)
-        except Exception:
-            logger.exception("加载链接菜单失败")
-
-        webvpnMenu.addActions(
+        self._webvpn_menu.addActions(
             [
                 Action(
                     text="一键登录链接",
@@ -241,42 +228,14 @@ class FloatBall(QWidget):
             ]
         )
 
-        menu.addMenu(linkMenu)
-        menu.addMenu(webvpnMenu)
-        menu.addMenu(accountMenu)
+        # 动态区内容先填充再挂载（addMenu 后 adjustSize 已就绪）
+        self._refresh_dynamic_menus()
 
+        menu.addMenu(self._link_menu)
+        menu.addMenu(self._webvpn_menu)
+        menu.addMenu(self._account_menu)
         if len(self.pm.plugins) > 0:
-            for plg in self.pm.plugins:
-                try:
-                    p = plg["object"]
-                    if self.pm.is_valid_func(p, "get_menu"):
-                        plg_actions = []
-                        plg_menu_items = p.get_menu()
-                        for a in plg_menu_items:
-                            try:
-                                if not callable(a.get("object")):
-                                    # 非可调用对象视为分隔线或暂不可用项，跳过
-                                    continue
-                                plg_actions.append(
-                                    Action(text=a["function"], triggered=a["object"])
-                                )
-                            except Exception:
-                                logger.exception(
-                                    f"插件 [{plg.get('name', '?')}] 菜单项 [{a.get('function', '?')}] 创建失败"
-                                )
-                        if not plg_actions:
-                            logger.warning(
-                                f"插件 [{plg.get('name', '?')}] 没有可用的菜单项"
-                            )
-                        else:
-                            sub_menu = MyRoundMenu(plg["name"], parent=pluginMenu)
-                            sub_menu.addActions(plg_actions)
-                            pluginMenu.addMenu(sub_menu)
-                except Exception:
-                    logger.exception(
-                        f"加载插件 [{plg.get('name', '?')}] 菜单失败"
-                    )
-            menu.addMenu(pluginMenu)
+            menu.addMenu(self._plugin_menu)
 
         menu.addSeparator()
         menu.addAction(
@@ -290,6 +249,157 @@ class FloatBall(QWidget):
             Action(text="隐藏", icon=FIF.HIDE, triggered=lambda: self.setHidden(True))
         )
         return menu
+
+    def _refresh_dynamic_menus(self, force: bool = False):
+        """刷新动态菜单区（账号/链接/插件）。
+
+        先计算内容指纹，与上次一致时直接跳过重建——既保证菜单反映最新
+        状态，又让"内容未变的日常打开"不产生任何 Qt 对象分配（每次重建
+        即使正确释放，也会带来堆内存缓存的持续增长）。
+        """
+        spec = self._dynamic_menus_spec()
+        if not force and spec is not None and spec == self._dynamic_spec:
+            return
+        self._dynamic_spec = spec
+        self._repopulate_account_menu()
+        self._repopulate_link_menu()
+        self._repopulate_plugin_menu()
+
+    def _dynamic_menus_spec(self):
+        """计算动态菜单区内容指纹（纯 Python 计算，不创建 Qt 对象）。
+
+        任何一项失败返回 None，调用方将强制重建（安全兜底）。
+        """
+        try:
+            # 账号区：索引 + 名称 + 密码哈希（密码变化也需重建菜单闭包）
+            accounts = []
+            for file in sorted(os.listdir("config")):
+                match = re.match(r"account_(\d+)\.toml", file)
+                if match:
+                    now = config.CfgParse("config/" + file)
+                    name = now.get("setting", "name")
+                    password = now.get("setting", "password", "")
+                    if name and password:
+                        accounts.append((int(match.group(1)), name, hash(password)))
+
+            # 链接区：links.toml 全文
+            links = str(
+                config.CfgParse(
+                    os.path.join(os.getcwd(), "config", "links.toml")
+                ).get_all()
+            )
+
+            # 插件区：各插件菜单项的功能名列表（内容变化即重建；
+            # 调用 get_menu() 产生的临时对象由引用计数立即回收）
+            plugins = []
+            for plg in self.pm.plugins:
+                p = plg["object"]
+                try:
+                    if self.pm.is_valid_func(p, "get_menu"):
+                        names = tuple(
+                            a.get("function") for a in (p.get_menu() or [])
+                            if isinstance(a, dict)
+                        )
+                    else:
+                        names = None
+                    plugins.append((plg["name"], names))
+                except Exception:
+                    plugins.append((plg.get("name", "?"), "ERROR"))
+
+            return (tuple(accounts), links, tuple(plugins))
+        except Exception:
+            return None
+
+    def _clear_menu_for_rebuild(self, menu):
+        """清空菜单并显式销毁旧子菜单。
+
+        qfluentwidgets 的 RoundMenu.clear()/removeMenu() 只把子菜单移出
+        _subMenus 列表并移除列表项，QObject 父子关系（parent=menu）仍然
+        保留，旧子菜单永远不会被释放——每次刷新会按子菜单数量线性泄漏。
+        因此先收集旧子菜单引用，clear 后逐个 deleteLater 显式释放。
+        """
+        old_submenus = list(menu._subMenus)
+        menu.clear()
+        for sub in old_submenus:
+            try:
+                sub.hide()
+            except RuntimeError:
+                pass  # C++ 对象已销毁，无需处理
+            sub.deleteLater()
+
+    def _repopulate_account_menu(self):
+        """重建账号子菜单（读取全部 account_*.toml）"""
+        menu = self._account_menu
+        self._clear_menu_for_rebuild(menu)
+        try:
+            for file in sorted(os.listdir("config")):
+                match = re.match(r"account_(\d+)\.toml", file)
+                if match:
+                    now = config.CfgParse("config/" + file)
+                    name = now.get("setting", "name")
+                    password = base64.b64decode(
+                        now.get("setting", "password", "").encode("utf-8")
+                    ).decode("utf-8")
+                    if name and password:
+                        index = int(match.group(1))
+                        menu.addAction(
+                            Action(
+                                text="切换为" + name,
+                                icon=FIF.CHAT,
+                                triggered=partial(self.change_account, name, password, index),
+                            )
+                        )
+            logger.info("账号菜单加载完成")
+        except Exception:
+            logger.exception("加载账号菜单失败")
+
+    def _repopulate_link_menu(self):
+        """重建链接子菜单（剪切板链接 + links.toml 全部类别）"""
+        menu = self._link_menu
+        self._clear_menu_for_rebuild(menu)
+        try:
+            menu.addAction(
+                Action(text="剪切板链接", icon=FIF.LINK, triggered=self.open_custom_link)
+            )
+            self.create_links_menu(menu)
+        except Exception:
+            logger.exception("加载链接菜单失败")
+
+    def _repopulate_plugin_menu(self):
+        """重建插件子菜单：逐个调用插件 get_menu()，单项失败不影响其他插件"""
+        menu = self._plugin_menu
+        self._clear_menu_for_rebuild(menu)
+        for plg in self.pm.plugins:
+            try:
+                p = plg["object"]
+                if not self.pm.is_valid_func(p, "get_menu"):
+                    continue
+                plg_actions = []
+                plg_menu_items = p.get_menu() or []
+                for a in plg_menu_items:
+                    try:
+                        if not callable(a.get("object")):
+                            # 非可调用对象视为分隔线或暂不可用项，跳过
+                            continue
+                        plg_actions.append(
+                            Action(text=a["function"], triggered=a["object"])
+                        )
+                    except Exception:
+                        logger.exception(
+                            f"插件 [{plg.get('name', '?')}] 菜单项 [{a.get('function', '?')}] 创建失败"
+                        )
+                if not plg_actions:
+                    logger.warning(
+                        f"插件 [{plg.get('name', '?')}] 没有可用的菜单项"
+                    )
+                else:
+                    sub_menu = MyRoundMenu(plg["name"], parent=menu)
+                    sub_menu.addActions(plg_actions)
+                    menu.addMenu(sub_menu)
+            except Exception:
+                logger.exception(
+                    f"加载插件 [{plg.get('name', '?')}] 菜单失败"
+                )
 
     def clipboard_convert_webvpn(self):
         count = 0
@@ -535,17 +645,36 @@ class FloatBall(QWidget):
 class Update_timer(QTimer):
     def __init__(self, wifi, parent=None):
         super().__init__(parent=parent)
+        self.wifi = wifi
+        self._thread = None  # 当前轮询线程引用（防重入）
+        self._worker = None
         try:
-            self.wifi = wifi
             main = config.CfgParse(os.path.join(os.getcwd(), "config", "main.toml"))
             interval = int(main.get("main", "timer_interval", 60000))
         except Exception:
             interval = 60000
-        self.setInterval(interval)
+        self.setInterval(max(interval, 10000))
         self.timeout.connect(self.update)
         self.start()
 
     def update(self):
-        state = self.wifi.getState()
-        if state.state == "未登录":
-            self.wifi.login()
+        """轮询入口：网络请求放入后台线程执行，避免阻塞 UI 主线程"""
+        try:
+            busy = self._thread is not None and self._thread.isRunning()
+        except RuntimeError:
+            # C++ 对象已销毁，视为空闲
+            busy = False
+            self._thread = None
+            self._worker = None
+        if busy:
+            logger.info("上一轮状态检查尚未完成，跳过本次轮询")
+            return
+
+        def do_update():
+            state = self.wifi.getState()
+            if state.state == "未登录":
+                self.wifi.login()
+
+        thread, worker = touda.start_worker_in_thread(do_update, "状态轮询")
+        self._thread = thread
+        self._worker = worker

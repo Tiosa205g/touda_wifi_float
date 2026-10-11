@@ -10,6 +10,7 @@ config.toml
 # Nuitka 插件依赖扫描生成的临时文件
 nuitka_plugin_deps.txt
 .vscode/
+.workbuddy/
 .omo/
 .omc/
 AGENTS.md
