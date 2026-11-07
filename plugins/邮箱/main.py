@@ -133,8 +133,9 @@ def _set_last_dt(v: str):
     _set_cfg('mail', 'last_dt', v)
 
 
-# 已提醒（含首次基线）的邮件 uid：ge 秒级过滤会重复取到水位同秒的旧邮件，
-# 靠这个集合去重，避免同一封反复弹窗（实测曾每分钟重复提醒）。
+# 已提醒（含首次基线）的邮件标识：ge 秒级过滤会重复取到水位同秒的旧邮件，
+# 靠这个集合去重；集合里同时存 uid 与 InternetMessageId（见 _item_keys），
+# 拦住同一封信跨文件夹/跨轮次的副本（实测曾每分钟重复提醒、一封信弹两封）。
 NOTIFIED_UIDS_MAX = 100
 
 # 全部已读单次处理上限：Graph 无「全部已读」接口，需逐封 PATCH，
@@ -175,10 +176,28 @@ def _register_notified(uids) -> None:
                  json.dumps(cur[-NOTIFIED_UIDS_MAX:], ensure_ascii=False))
 
 
+def _item_keys(it: dict) -> list:
+    """一条消息的去重键：Graph uid + internetMessageId
+
+    同一封信在邮箱里可能有多个副本（自发自收：收件箱/已发送各一份；
+    邮件在文件夹间移动后 uid 也会变），副本 uid 不同但 internetMessageId
+    相同——两个键都进已提醒集合才能拦住重复提醒。
+    """
+    keys = [str(it.get('uid') or ''), str(it.get('msgid') or '')]
+    return [k for k in keys if k]
+
+
 def _filter_fresh(items: list) -> list:
-    """滤掉已提醒过的邮件，只留真正的新件"""
+    """滤掉已提醒过的邮件，只留真正的新件（同批次内同信副本也去重）"""
     seen = set(_get_notified_uids())
-    return [it for it in items if str(it.get('uid') or '') not in seen]
+    out = []
+    for it in items:
+        keys = _item_keys(it)
+        if any(k in seen for k in keys):
+            continue
+        seen.update(keys)  # 同批次内两副本互斥
+        out.append(it)
+    return out
 
 
 def _load_notify_log() -> list:
@@ -419,16 +438,21 @@ class MailClient:
     def fetch_new_headers(self, since_iso: str, limit: int = 8) -> list:
         """取指定时间之后的新邮件（新通知用）
 
+        只查收件箱（`/me/mailFolders/inbox/messages`，与收件箱列表/未读数
+        同一范围）：`/me/messages` 是全邮箱，自发自收的信在「已发送」还有
+        一个副本，会被当成第二封新邮件（实测一封信弹“2 封新邮件”）。
+        外发邮件的「已发送」副本也不该算收进的新件。
+
         用 `ge` + 秒级字面量（宁多取不漏）：水位带亚秒精度，而 OData 字面量
         只能到秒，`gt` 反而会漏掉同秒内更早的邮件；多取到的重复件由调用方
-        的 uid 已提醒集合去重。
+        的 uid/InternetMessageId 已提醒集合去重。
         """
         wm = _iso_sec(since_iso)
-        j = self._graph_get('/me/messages', {
+        j = self._graph_get('/me/mailFolders/inbox/messages', {
             '$filter': f'receivedDateTime ge {wm}',
             '$orderby': 'receivedDateTime desc',
             '$top': str(limit),
-            '$select': 'id,subject,from,receivedDateTime,isRead',
+            '$select': 'id,subject,from,receivedDateTime,isRead,internetMessageId',
         })
         return [self._to_item(m) for m in j.get('value', [])]
 
@@ -776,6 +800,7 @@ class MailClient:
     def _to_item(cls, m: dict) -> dict:
         return {
             'uid': str(m.get('id') or ''),
+            'msgid': str(m.get('internetMessageId') or ''),
             'subject': str(m.get('subject') or '(无主题)'),
             'from': cls._addr_str(m.get('from')),
             'date': _fmt_dt(m.get('receivedDateTime')),
@@ -2168,19 +2193,20 @@ class Plugin:  # 类名固定为 Plugin，不能变动，否则无法识别
             self.set_unread(result.get('unseen') or 0)
             baseline = result.get('baseline')
             if baseline is not None:
-                _register_notified(
-                    it.get('uid') for it in (result.get('baseline_items') or []))
+                for it in (result.get('baseline_items') or []):
+                    _register_notified(_item_keys(it))
                 if baseline:
                     _set_last_dt(self._newest_iso(baseline, result))
                 return
             new_items = result.get('new') or []
             if not new_items:
                 return
-            # ge 秒级过滤会重复取到水位同秒的旧邮件 → uid 去重，只提醒 fresh
+            # ge 秒级过滤会重复取到水位同秒的旧邮件 → uid/msgid 去重，只提醒 fresh
             fresh = _filter_fresh(new_items)
             # 水位推进到全部取到的最新一封（含已提醒的边界件），带亚秒精度
             _set_last_dt(self._newest_iso(None, {'new': new_items}))
-            _register_notified(it.get('uid') for it in new_items)
+            for it in new_items:
+                _register_notified(_item_keys(it))
             if fresh:
                 self._show_notify(fresh)
 

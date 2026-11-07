@@ -51,7 +51,9 @@ class Tray(QSystemTrayIcon):
 
         # 创建新的设置窗口，并在销毁时自动清理引用
         try:
-            self._settings_win = SettingsWindow(version=self._version)
+            # 传入插件管理器供「插件」管理页使用（parent 为悬浮球窗口，持有 pm）
+            pm = getattr(self.parent(), 'pm', None)
+            self._settings_win = SettingsWindow(version=self._version, pm=pm)
             # 窗口关闭并删除后，自动将引用置空，避免悬空对象
             # 使用弱引用避免 lambda 强捕获 self 导致引用循环
             weak_self = weakref.ref(self)

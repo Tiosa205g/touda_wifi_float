@@ -234,8 +234,8 @@ class FloatBall(QWidget):
         menu.addMenu(self._link_menu)
         menu.addMenu(self._webvpn_menu)
         menu.addMenu(self._account_menu)
-        if len(self.pm.plugins) > 0:
-            menu.addMenu(self._plugin_menu)
+        # 插件子菜单常驻（空时显示占位项），运行时启用/禁用插件后结构保持正确
+        menu.addMenu(self._plugin_menu)
 
         menu.addSeparator()
         menu.addAction(
@@ -257,6 +257,9 @@ class FloatBall(QWidget):
         状态，又让"内容未变的日常打开"不产生任何 Qt 对象分配（每次重建
         即使正确释放，也会带来堆内存缓存的持续增长）。
         """
+        if self._account_menu is None:
+            # 菜单框架尚未构建（首次右键前），无需刷新；构建时会填充最新内容
+            return
         spec = self._dynamic_menus_spec()
         if not force and spec is not None and spec == self._dynamic_spec:
             return
@@ -400,6 +403,11 @@ class FloatBall(QWidget):
                 logger.exception(
                     f"加载插件 [{plg.get('name', '?')}] 菜单失败"
                 )
+        # 无可用插件时放一个禁用占位项，保持子菜单结构稳定
+        if not menu._subMenus:
+            placeholder = Action(text="（无可用插件）")
+            placeholder.setEnabled(False)
+            menu.addAction(placeholder)
 
     def clipboard_convert_webvpn(self):
         count = 0

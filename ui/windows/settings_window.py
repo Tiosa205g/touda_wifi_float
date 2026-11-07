@@ -6,9 +6,16 @@ import winreg
 import base64
 from typing import Dict, List
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QCursor, QGuiApplication, QIcon
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QListWidget,
+    QListWidgetItem,
+    QTextBrowser,
+    QVBoxLayout,
+    QWidget,
+)
 
 from qfluentwidgets import (
     FluentWindow,
@@ -21,6 +28,7 @@ from qfluentwidgets import (
     EditableComboBox,
     PushButton,
     StrongBodyLabel,
+    CaptionLabel,
     InfoBar,
     FluentIcon as FIF,
     setTheme,
@@ -938,8 +946,303 @@ class LinksInterface(_BaseInterface):
         self.reload_types()
 
 
+class PluginsInterface(QWidget):
+    """插件管理：左侧插件列表，右侧详情（简介/启用/设置）"""
+
+    def __init__(self, parent=None, pm=None):
+        super().__init__(parent)
+        self.pm = pm
+        self._entries: Dict[str, dict] = {}
+        self._current_id = None
+        self._loading_list = False
+
+        root = QHBoxLayout(self)
+        root.setContentsMargins(36, 20, 36, 20)
+        root.setSpacing(16)
+
+        # ── 左侧：插件列表 ──
+        left = QWidget(self)
+        lv = QVBoxLayout(left)
+        lv.setContentsMargins(0, 0, 0, 0)
+        lv.setSpacing(8)
+        self.listWidget = QListWidget(left)
+        self.listWidget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.listWidget.setSpacing(2)  # 行间距：靠布局实现，不能用 ::item margin（不参与行高计算）
+        self.listWidget.currentRowChanged.connect(self._on_select_row)
+        lv.addWidget(self.listWidget, 1)
+        left.setFixedWidth(240)
+        root.addWidget(left)
+
+        # ── 右侧：插件详情 ──
+        right = QWidget(self)
+        rv = QVBoxLayout(right)
+        rv.setContentsMargins(0, 0, 0, 0)
+        rv.setSpacing(12)
+
+        header = QWidget(right)
+        hh = QHBoxLayout(header)
+        hh.setContentsMargins(0, 0, 0, 0)
+        hh.setSpacing(12)
+
+        self.nameLabel = StrongBodyLabel('', header)
+        hh.addWidget(self.nameLabel)
+        self.stateLabel = CaptionLabel('', header)
+        hh.addWidget(self.stateLabel)
+        hh.addStretch(1)
+
+        self.switch = SwitchButton(header)
+        self.switch.setOnText('启用')
+        self.switch.setOffText('禁用')
+        self.switch.checkedChanged.connect(self._on_toggle)
+        hh.addWidget(self.switch)
+
+        self.btnSetting = PushButton('设置', header)
+        self.btnSetting.setFixedWidth(80)
+        self.btnSetting.clicked.connect(self._on_setting)
+        hh.addWidget(self.btnSetting)
+
+        self.btnDir = PushButton('目录', header)
+        self.btnDir.setFixedWidth(80)
+        self.btnDir.clicked.connect(self._on_dir)
+        hh.addWidget(self.btnDir)
+        rv.addWidget(header)
+
+        self.errorLabel = CaptionLabel('', right)
+        self.errorLabel.setWordWrap(True)
+        self.errorLabel.setStyleSheet(
+            'color: #ef5350; background: transparent; font-size: 12px;'
+        )
+        self.errorLabel.hide()
+        rv.addWidget(self.errorLabel)
+
+        self.descBrowser = QTextBrowser(right)
+        self.descBrowser.setOpenExternalLinks(True)
+        self.descBrowser.setMarkdown('从左侧列表选择一个插件查看详情。')
+        rv.addWidget(self.descBrowser, 1)
+
+        hint = CaptionLabel(
+            '开关即时生效；「设置」打开插件自带设置界面，无自带界面时编辑其 config.toml。'
+            '添加新插件文件后需重启软件。',
+            right,
+        )
+        hint.setWordWrap(True)
+        rv.addWidget(hint)
+
+        root.addWidget(right, 1)
+        self.reload()
+
+    # ── 列表构建 ──
+
+    def reload(self):
+        """重建左侧插件列表（启用/禁用后调用以刷新状态），保持当前选中项"""
+        keep_id = self._current_id
+        self._loading_list = True
+        self.listWidget.blockSignals(True)
+        self.listWidget.clear()
+        self._entries.clear()
+
+        entries = self.pm.get_plugin_entries() if self.pm is not None else []
+
+        if not entries:
+            item = QListWidgetItem(
+                '插件管理器不可用' if self.pm is None
+                else '未发现任何插件（plugins 目录为空）'
+            )
+            item.setFlags(Qt.NoItemFlags)  # 占位项不可选
+            item.setSizeHint(QSize(0, 40))
+            self.listWidget.addItem(item)
+        else:
+            for entry in entries:
+                self._entries[entry['id']] = entry
+                item = QListWidgetItem(self._item_text(entry))
+                item.setData(Qt.UserRole, entry['id'])
+                item.setToolTip(self._summary(entry, 120) or entry['name'])
+                # 显式行高：QSS 的 padding 不参与行高计算，必须靠 sizeHint 撑开，
+                # 否则相邻表项文本会重叠
+                item.setSizeHint(QSize(0, 40))
+                self.listWidget.addItem(item)
+
+        self.listWidget.blockSignals(False)
+        self._loading_list = False
+
+        # 恢复原选中项；失效则选第一项
+        target_row = -1
+        if keep_id in self._entries:
+            for row in range(self.listWidget.count()):
+                if self.listWidget.item(row).data(Qt.UserRole) == keep_id:
+                    target_row = row
+                    break
+        if target_row < 0 and self._entries:
+            target_row = 0
+        if target_row >= 0:
+            self.listWidget.setCurrentRow(target_row)  # 触发 _on_select_row
+        else:
+            self._show_detail(None)
+
+    @staticmethod
+    def _item_text(entry: dict) -> str:
+        """列表项文字：名称 + 状态后缀"""
+        suffix = {
+            'enabled': '· 已启用',
+            'disabled': '· 已禁用',
+        }.get(entry['state'], '· 加载失败')
+        return f"{entry['name']}  {suffix}"
+
+    def _on_select_row(self, row: int):
+        if self._loading_list:
+            return
+        item = self.listWidget.item(row)
+        pid = item.data(Qt.UserRole) if item is not None else None
+        self._current_id = pid
+        self._show_detail(self._entries.get(pid))
+
+    def _show_detail(self, entry: dict | None):
+        """填充右侧详情面板"""
+        has = entry is not None
+        for w in (self.switch, self.btnSetting, self.btnDir):
+            w.setEnabled(has)
+
+        if not has:
+            self.nameLabel.setText('未选择插件')
+            self.stateLabel.setText('')
+            self.errorLabel.hide()
+            self.descBrowser.setMarkdown('从左侧列表选择一个插件查看详情。')
+            return
+
+        self.nameLabel.setText(entry['name'])
+        self.stateLabel.setText(self._state_text(entry))
+        self.stateLabel.setStyleSheet(self._state_style(entry))
+
+        if entry.get('error'):
+            self.errorLabel.setText(f"加载失败：{entry['error']}")
+            self.errorLabel.show()
+        else:
+            self.errorLabel.hide()
+
+        # 同步开关（阻断信号，避免误触发启停）
+        self.switch.blockSignals(True)
+        self.switch.setChecked(entry['state'] == 'enabled')
+        self.switch.blockSignals(False)
+
+        desc = (entry.get('description') or '').strip()
+        self.descBrowser.setMarkdown(desc if desc else '该插件未提供简介。')
+
+    @staticmethod
+    def _state_text(entry: dict) -> str:
+        return {'enabled': '已启用', 'disabled': '已禁用'}.get(
+            entry['state'], '加载失败'
+        )
+
+    @staticmethod
+    def _state_style(entry: dict) -> str:
+        color = {'enabled': '#4caf50', 'disabled': '#9e9e9e'}.get(
+            entry['state'], '#ef5350'
+        )
+        return f"color: {color}; background: transparent; font-size: 12px;"
+
+    @staticmethod
+    def _summary(entry: dict, limit: int = 90) -> str:
+        """取描述第一行非空文本（readme 首行）作为单行摘要"""
+        for line in (entry.get('description') or '').splitlines():
+            t = line.strip().lstrip('#').strip()
+            if t:
+                return t if len(t) <= limit else t[:limit] + '…'
+        return ''
+
+    # ── 交互 ──
+
+    def _find_entry(self, pid: str):
+        """按 id 重新查询最新条目（避免持有过期状态）"""
+        if self.pm is None or pid is None:
+            return None
+        for e in self.pm.get_plugin_entries():
+            if e['id'] == pid:
+                return e
+        return None
+
+    def _on_toggle(self, checked: bool):
+        pid = self._current_id
+        if pid is None or self.pm is None:
+            return
+        ok, msg = self.pm.set_plugin_enabled(pid, checked)
+        if not ok:
+            # 回退开关状态（阻断信号避免递归）
+            self.switch.blockSignals(True)
+            self.switch.setChecked(not checked)
+            self.switch.blockSignals(False)
+            InfoBar.error(
+                title='操作失败',
+                content=msg or '未知错误',
+                parent=self, duration=4000,
+            )
+            return
+        entry = self._find_entry(pid)
+        InfoBar.success(
+            title='插件已启用' if checked else '插件已禁用',
+            content=entry['name'] if entry else pid,
+            parent=self, duration=2000,
+        )
+        # 重建列表刷新状态后缀，保持选中项
+        self.reload()
+
+    def _on_setting(self):
+        pid = self._current_id
+        entry = self._find_entry(pid)
+        if entry is None:
+            InfoBar.warning(title='插件不存在', content=str(pid), parent=self, duration=3000)
+            return
+        # 1) 运行中的插件且自带设置界面 → 打开插件自己的设置
+        if entry['state'] == 'enabled' and entry['has_setting']:
+            ok, msg = self.pm.open_plg_setting_by_id(pid)
+            if not ok:
+                InfoBar.error(title='打开设置失败', content=msg, parent=self, duration=4000)
+            return
+        # 2) 有 config.toml → 通用参数编辑器（禁用状态下也可编辑）
+        cfg_path = self.pm.get_config_path(pid)
+        if cfg_path:
+            from ui.components.plugin_config_dialog import PluginConfigDialog
+            dlg = PluginConfigDialog(
+                entry['name'], cfg_path,
+                on_saved=lambda p=pid: self._apply_plugin_config(p),
+                parent=self,
+            )
+            dlg.exec()
+            return
+        # 3) 都没有
+        InfoBar.info(
+            title='没有可配置参数',
+            content='该插件未提供设置界面，也没有 config.toml',
+            parent=self, duration=3000,
+        )
+
+    def _apply_plugin_config(self, pid: str):
+        """通用编辑器保存后通知运行中的插件应用新配置"""
+        entry = self._find_entry(pid)
+        if not entry or entry['state'] != 'enabled':
+            return
+        obj = entry.get('object')
+        fn = getattr(obj, 'apply_settings', None)
+        if callable(fn):
+            try:
+                fn()
+            except Exception:
+                logger.exception(f'插件 {pid} 应用配置失败')
+
+    def _on_dir(self):
+        entry = self._find_entry(self._current_id)
+        if entry is None:
+            return
+        self._open_dir(entry['dir'])
+
+    def _open_dir(self, path: str):
+        try:
+            os.startfile(path)  # noqa: S606  Windows 本项目专用
+        except Exception as e:
+            InfoBar.error(title='打开目录失败', content=str(e), parent=self, duration=4000)
+
+
 class SettingsWindow(FluentWindow):
-    def __init__(self, parent=None, version: str = "v1.0.0"):
+    def __init__(self, parent=None, version: str = "v1.0.0", pm=None):
         super().__init__(parent)
         self._version = version
         ensure_cfg()  # 确保配置目录和文件存在（一次即可）
@@ -991,13 +1294,17 @@ class SettingsWindow(FluentWindow):
         self.accountsInterface.setObjectName('accountsInterface')
         self.linksInterface = LinksInterface(self)
         self.linksInterface.setObjectName('linksInterface')
+        self.pluginsInterface = PluginsInterface(self, pm=pm)
+        self.pluginsInterface.setObjectName('pluginsInterface')
 
         # 避免子页面成为原生子窗口，破坏弹出层父级判断
-        for w in (self.generalInterface, self.webvpnInterface, self.accountsInterface, self.linksInterface):
+        for w in (self.generalInterface, self.webvpnInterface, self.accountsInterface,
+                  self.linksInterface, self.pluginsInterface):
             try:
                 w.setAttribute(Qt.WA_NativeWindow, False)
                 w.setAttribute(Qt.WA_DontCreateNativeAncestors, True)
-                w.viewport().setAttribute(Qt.WA_NativeWindow, False)
+                vp = w.viewport() if hasattr(w, 'viewport') else w
+                vp.setAttribute(Qt.WA_NativeWindow, False)
             except Exception:
                 pass
 
@@ -1007,6 +1314,7 @@ class SettingsWindow(FluentWindow):
         self.addSubInterface(self.webvpnInterface, FIF.VPN, 'WebVPN', NavigationItemPosition.TOP, isTransparent=True)
         self.addSubInterface(self.accountsInterface, FIF.PEOPLE, 'WiFi账户', NavigationItemPosition.TOP, isTransparent=True)
         self.addSubInterface(self.linksInterface, FIF.LINK, '链接', NavigationItemPosition.TOP, isTransparent=True)
+        self.addSubInterface(self.pluginsInterface, FIF.DEVELOPER_TOOLS, '插件', NavigationItemPosition.TOP, isTransparent=True)
 
         self.navigationInterface.setExpandWidth(240)
         self.stackedWidget.setCurrentWidget(self.generalInterface)
@@ -1060,7 +1368,7 @@ class SettingsWindow(FluentWindow):
         选择器限定在四个设置页内，防止样式经父子关系级联到确认弹窗的按钮上。
         """
         pages = ('#generalInterface', '#webvpnInterface',
-                 '#accountsInterface', '#linksInterface')
+                 '#accountsInterface', '#linksInterface', '#pluginsInterface')
 
         def scoped(selector: str) -> str:
             return ', '.join(f'{p} {selector}' for p in pages)
@@ -1124,6 +1432,34 @@ class SettingsWindow(FluentWindow):
 }}
 {scoped('LineEdit:focus')}, {scoped('PasswordLineEdit:focus')}, {scoped('ComboBox:focus')} {{
     border: 2px solid {focus_border};
+}}
+{scoped('QListWidget')} {{
+    background: {field_bg};
+    border: 2px solid {field_border};
+    border-radius: 8px;
+    outline: none;
+    padding: 4px;
+}}
+{scoped('QListWidget::item')} {{
+    padding: 6px 10px;
+    border-radius: 6px;
+    color: {field_fg};
+}}
+{scoped('QListWidget::item:hover')} {{
+    background: {btn_hover};
+    color: #fff;
+}}
+{scoped('QListWidget::item:selected')} {{
+    background: {btn_bg};
+    color: #fff;
+}}
+{scoped('QTextBrowser')} {{
+    background: {field_bg};
+    color: {field_fg};
+    border: 2px solid {field_border};
+    border-radius: 8px;
+    padding: 8px;
+    selection-background-color: {btn_bg};
 }}
 """
         # 直接替换样式，避免多次叠加导致性能与视觉问题
