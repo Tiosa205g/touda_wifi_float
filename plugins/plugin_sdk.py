@@ -8,6 +8,7 @@ from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (
     QApplication, QWidget, QStyle, QStyledItemDelegate,
     QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
+    QGraphicsDropShadowEffect,
 )
 
 
@@ -297,12 +298,23 @@ class _NotifyPopup(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.setFixedWidth(self._W)
 
+        # ── 主题色（与主程序弹窗一致） ──
+        from ui.components.frameless_dialog import _theme_colors
+        bg, text, sec, border = _theme_colors()
+        try:
+            from qfluentwidgets import isDarkTheme
+            dark = isDarkTheme()
+        except Exception:
+            dark = False
+        hint_color = '#6a9fff' if dark else '#0078D4'
+        close_hover = '#3a3a3a' if dark else '#e0e0e0'
+
         # ── 圆角背景卡片 ──
         card = QWidget(self)
         card.setObjectName('npCard')
         card.setStyleSheet(
-            '#npCard { background: #2b2b2b; border: 1px solid #484848;'
-            ' border-radius: 10px; }')
+            f'#npCard {{ background: {bg}; border: 1px solid {border};'
+            f' border-radius: 10px; }}')
         lay = QVBoxLayout(card)
         lay.setContentsMargins(16, 12, 16, 12)
         lay.setSpacing(6)
@@ -321,16 +333,17 @@ class _NotifyPopup(QWidget):
 
         title_lbl = QLabel(str(title)[:80], trow)
         title_lbl.setStyleSheet(
-            'color: #ffffff; font-size: 13px; font-weight: 600;'
-            ' background: transparent;')
+            f'color: {text}; font-size: 13px; font-weight: 600;'
+            f' background: transparent;')
         tl.addWidget(title_lbl, 1)
 
         self._btn_close = QPushButton('\u2715', trow)
         self._btn_close.setFixedSize(22, 22)
         self._btn_close.setStyleSheet(
-            'QPushButton { color: #999; background: transparent;'
-            ' border: none; font-size: 13px; border-radius: 11px; }'
-            'QPushButton:hover { background: #555; color: #fff; }')
+            f'QPushButton {{ color: {sec}; background: transparent;'
+            f' border: none; font-size: 13px; border-radius: 11px; }}'
+            f'QPushButton:hover {{ background: {close_hover};'
+            f' color: {text}; }}')
         self._btn_close.clicked.connect(self._dismiss)
         tl.addWidget(self._btn_close)
         lay.addWidget(trow)
@@ -339,19 +352,26 @@ class _NotifyPopup(QWidget):
         body_lbl = QLabel(str(body)[:300], card)
         body_lbl.setWordWrap(True)
         body_lbl.setStyleSheet(
-            'color: #cccccc; font-size: 12px; background: transparent;')
+            f'color: {text}; font-size: 12px; background: transparent;')
         lay.addWidget(body_lbl)
 
         # 点击提示
         if self._on_click:
             hint = QLabel('\u70b9\u51fb\u67e5\u770b', card)
             hint.setStyleSheet(
-                'color: #6a9fff; font-size: 11px; background: transparent;')
+                f'color: {hint_color}; font-size: 11px;'
+                f' background: transparent;')
             lay.addWidget(hint)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
+        # 四周留白给柔和投影（与主程序弹窗一致）
+        outer.setContentsMargins(12, 10, 12, 16)
         outer.addWidget(card)
+        shadow = QGraphicsDropShadowEffect(card)
+        shadow.setBlurRadius(28)
+        shadow.setOffset(0, 6)
+        shadow.setColor(QColor(0, 0, 0, 90))
+        card.setGraphicsEffect(shadow)
 
         # 子控件鼠标事件透传到弹窗（关闭按钮除外）
         for w in self.findChildren(QWidget):

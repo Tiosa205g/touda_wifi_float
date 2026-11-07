@@ -631,6 +631,12 @@ class NoticeViewerDialog(FramelessDialog):
     def _fill_table(self, rows):
         self.table.setRowCount(0)
         wm = self._watermark
+        # 新通知红色随主题（深色用亮红，与邮箱插件一致）
+        try:
+            from qfluentwidgets import isDarkTheme
+            new_color = QColor('#ff7d7d' if isDarkTheme() else '#e05252')
+        except Exception:
+            new_color = QColor('#e05252')
         for row in rows:
             r = self.table.rowCount()
             self.table.insertRow(r)
@@ -639,7 +645,7 @@ class NoticeViewerDialog(FramelessDialog):
             title_item = QTableWidgetItem(row['title'])
             title_item.setData(Qt.UserRole, row['docid'])
             if is_new:
-                title_item.setForeground(QColor('#e05252'))
+                title_item.setForeground(new_color)
                 f = QFont()
                 f.setBold(True)
                 title_item.setFont(f)
