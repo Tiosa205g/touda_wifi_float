@@ -51,6 +51,7 @@ OA_FILE_DL_FMT = (OA_BASE + '/weaver/weaver.file.FileDownload'
 DEFAULT_PAGESIZE = 20
 DEFAULT_POLL_MINUTES = 10
 NOTIFY_LOG_MAX = 20
+READ_SET_MAX = 500  # 逐条已读记录上限（按 docid 保留最新）
 
 # 行解析：标题(完整内容在 title 属性) + 发布单位 + 发布日期
 # 兼容 WebVPN 重写后的绝对 URL，只依赖 docid 还原详情链接
@@ -112,6 +113,47 @@ def _get_watermark() -> int:
 
 def _set_watermark(v: int):
     _set_cfg('notice', 'watermark_docid', int(v))
+
+
+def _watermark_initialized() -> bool:
+    """水位键是否已写入过（区分「首次运行建基线」与「用户重置为 0」）"""
+    try:
+        cfg = _load_cfg()
+        return 'watermark_docid' in (cfg.get('notice') or {})
+    except Exception:
+        return False
+
+
+def _load_read_set() -> set:
+    """逐条已读集合：单条查看只记录自身，不推进水位、不波及其他未读"""
+    try:
+        raw = _get_cfg('notice', 'read_docids', []) or []
+        return {int(x) for x in raw}
+    except Exception:
+        return set()
+
+
+def _save_read_set(s):
+    wm = _get_watermark()
+    # 水位已覆盖的记录冗余，裁掉；按 docid 保留最新 READ_SET_MAX 条
+    items = sorted({int(x) for x in s if int(x) > wm})[-READ_SET_MAX:]
+    _set_cfg('notice', 'read_docids', items)
+
+
+def _add_read_docid(v: int):
+    v = int(v)
+    if v <= _get_watermark():
+        return
+    s = _load_read_set()
+    if v in s:
+        return
+    s.add(v)
+    _save_read_set(s)
+
+
+def _is_read(docid: int) -> bool:
+    docid = int(docid)
+    return docid <= _get_watermark() or docid in _load_read_set()
 
 
 def _get_pagesize() -> int:
@@ -598,8 +640,9 @@ class NoticeViewerDialog(FramelessDialog):
             self._depts = [('-1', '全部')] + [d for d in depts if d[0] != '-1']
             self._fill_depts()
 
-        # 首次运行建立基线水位，避免全部标红
-        if self._watermark <= 0 and rows:
+        # 首次运行建立基线水位，避免全部标红；
+        # 用户主动重置（水位=0）后不再重建基线，保持全部为新
+        if not _watermark_initialized() and rows:
             self._watermark = max(r['docid'] for r in rows)
             _set_watermark(self._watermark)
 
@@ -631,6 +674,7 @@ class NoticeViewerDialog(FramelessDialog):
     def _fill_table(self, rows):
         self.table.setRowCount(0)
         wm = self._watermark
+        read_set = _load_read_set()
         # 新通知红色随主题（深色用亮红，与邮箱插件一致）
         try:
             from qfluentwidgets import isDarkTheme
@@ -640,7 +684,8 @@ class NoticeViewerDialog(FramelessDialog):
         for row in rows:
             r = self.table.rowCount()
             self.table.insertRow(r)
-            is_new = int(row['docid']) > wm
+            docid = int(row['docid'])
+            is_new = docid > wm and docid not in read_set
 
             title_item = QTableWidgetItem(row['title'])
             title_item.setData(Qt.UserRole, row['docid'])
@@ -687,19 +732,20 @@ class NoticeViewerDialog(FramelessDialog):
         return item.data(Qt.UserRole)
 
     def _mark_item_read(self, docid: int):
-        """标记单条通知已读：推进水位 + 取消该行红色加粗"""
-        if not docid or int(docid) <= self._watermark:
+        """标记单条通知已读：仅记录该条，不影响其他未读通知"""
+        docid = int(docid or 0)
+        if not docid or _is_read(docid):
             return
-        self._watermark = int(docid)
-        _set_watermark(self._watermark)
+        _add_read_docid(docid)
         for r in range(self.table.rowCount()):
             item = self.table.item(r, 0)
             if item is None:
                 continue
             v = item.data(Qt.UserRole)
-            if v and int(v) <= self._watermark:
+            if v and int(v) == docid:
                 item.setForeground(QBrush())
                 item.setFont(QFont())
+                break
 
     def mark_read(self):
         docids = []
@@ -712,6 +758,8 @@ class NoticeViewerDialog(FramelessDialog):
         if docids:
             self._watermark = max(self._watermark, max(docids))
             _set_watermark(self._watermark)
+            # 水位已覆盖全部可见通知，清掉冗余的逐条已读记录
+            _save_read_set(_load_read_set())
             self._fill_table([
                 {
                     'docid': self.table.item(r, 0).data(Qt.UserRole),
@@ -1023,6 +1071,8 @@ class SettingDialog(FramelessDialog):
 
     def _reset_watermark(self):
         _set_watermark(0)
+        # 同时清掉逐条已读记录，保证重置后所有通知都恢复“新”状态
+        _set_cfg('notice', 'read_docids', [])
         self.plugin.sdk.logger_info('新通知水位已重置')
 
     @staticmethod
@@ -1156,7 +1206,7 @@ class Plugin:  # 类名固定为 Plugin，不能变动，否则无法识别
             if notified <= 0:
                 # 首次：建立提醒基线，不打扰用户（已读水位同时兜底）
                 _set_notified(latest)
-                if _get_watermark() <= 0:
+                if not _watermark_initialized():
                     _set_watermark(latest)
                 return
 
@@ -1200,12 +1250,10 @@ class Plugin:  # 类名固定为 Plugin，不能变动，否则无法识别
         self.notifier.notify(title, body, on_click=self.show_viewer)
 
     def open_notice_detail(self, docid: int, parent=None, meta: dict = None):
-        """应用内打开通知详情（正文 + 附件下载 + 跳转原页面），自动标记已读"""
+        """应用内打开通知详情（正文 + 附件下载 + 跳转原页面），自动标记该条已读"""
         try:
-            # 自动标记已读：推进水位
-            wm = _get_watermark()
-            if int(docid) > wm:
-                _set_watermark(int(docid))
+            # 自动标记已读：仅记录该条（不推进水位，避免连带其他未读变已读）
+            _add_read_docid(int(docid))
             item = dict(meta or {})
             item['docid'] = int(docid)
             NoticeDetailDialog(self, item, parent=parent).exec()
